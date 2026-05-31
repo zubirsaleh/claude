@@ -1,0 +1,128 @@
+//@version=5
+strategy(
+     title        = "XAU/USD 200-Day Backtest | EMA + RSI + ATR",
+     shorttitle   = "XAUUSD_BT",
+     overlay      = true,
+     default_qty_type  = strategy.percent_of_equity,
+     default_qty_value = 10,
+     initial_capital   = 10000,
+     commission_type   = strategy.commission.percent,
+     commission_value  = 0.07,
+     slippage          = 3,
+     max_bars_back     = 500
+)
+
+// ─── INPUTS ──────────────────────────────────────────────────────────────────
+
+grp_range = "Backtest Range"
+i_start   = input.time(timestamp("2025-08-13"), "Start date", group = grp_range)
+i_end     = input.time(timestamp("2026-05-31"), "End date",   group = grp_range)
+
+grp_ema   = "EMA Settings"
+i_fast    = input.int(21,  "Fast EMA",   minval = 1,  group = grp_ema)
+i_slow    = input.int(50,  "Slow EMA",   minval = 1,  group = grp_ema)
+i_trend   = input.int(200, "Trend EMA",  minval = 1,  group = grp_ema)
+
+grp_rsi   = "RSI Filter"
+i_rsiLen  = input.int(14,  "RSI Length", minval = 1,  group = grp_rsi)
+i_rsiOB   = input.int(70,  "Overbought", minval = 50, group = grp_rsi)
+i_rsiOS   = input.int(30,  "Oversold",   maxval = 50, group = grp_rsi)
+
+grp_atr   = "ATR Risk Management"
+i_atrLen  = input.int(14,  "ATR Length", minval = 1,  group = grp_atr)
+i_slMult  = input.float(1.5, "Stop Loss (×ATR)",   minval = 0.1, step = 0.1, group = grp_atr)
+i_tpMult  = input.float(3.0, "Take Profit (×ATR)", minval = 0.1, step = 0.1, group = grp_atr)
+
+grp_dir   = "Trade Direction"
+i_long    = input.bool(true,  "Allow Longs",  group = grp_dir)
+i_short   = input.bool(true,  "Allow Shorts", group = grp_dir)
+
+// ─── INDICATORS ──────────────────────────────────────────────────────────────
+
+emaFast  = ta.ema(close, i_fast)
+emaSlow  = ta.ema(close, i_slow)
+emaTrend = ta.ema(close, i_trend)
+rsi      = ta.rsi(close, i_rsiLen)
+atr      = ta.atr(i_atrLen)
+
+// ─── SIGNALS ─────────────────────────────────────────────────────────────────
+
+bullCross = ta.crossover(emaFast, emaSlow)
+bearCross = ta.crossunder(emaFast, emaSlow)
+
+// Trend filter: trade in direction of 200 EMA
+aboveTrend = close > emaTrend
+belowTrend = close < emaTrend
+
+longSignal  = bullCross and aboveTrend and rsi < i_rsiOB
+shortSignal = bearCross and belowTrend and rsi > i_rsiOS
+
+// ─── DATE FILTER ─────────────────────────────────────────────────────────────
+
+inRange = time >= i_start and time <= i_end
+
+// ─── EXECUTE TRADES ──────────────────────────────────────────────────────────
+
+if inRange and longSignal and i_long and strategy.position_size == 0
+    sl = close - atr * i_slMult
+    tp = close + atr * i_tpMult
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop = sl, limit = tp)
+
+if inRange and shortSignal and i_short and strategy.position_size == 0
+    sl = close + atr * i_slMult
+    tp = close - atr * i_tpMult
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop = sl, limit = tp)
+
+// Close all positions at end of range
+if time > i_end and strategy.position_size != 0
+    strategy.close_all(comment = "Range end")
+
+// ─── PLOTS ───────────────────────────────────────────────────────────────────
+
+plot(emaFast,  "EMA 21",  color = color.new(color.yellow, 0),  linewidth = 1)
+plot(emaSlow,  "EMA 50",  color = color.new(color.orange, 0),  linewidth = 1)
+plot(emaTrend, "EMA 200", color = color.new(color.white,  0),  linewidth = 2)
+
+// Signal markers
+plotshape(inRange and longSignal,  title = "Long Signal",  style = shape.triangleup,
+     location = location.belowbar, color = color.new(color.lime, 0),  size = size.small)
+plotshape(inRange and shortSignal, title = "Short Signal", style = shape.triangledown,
+     location = location.abovebar, color = color.new(color.red,  0),  size = size.small)
+
+// Background: bull/bear zone
+bgcolor(aboveTrend ? color.new(color.green, 93) : color.new(color.red, 93), title = "Trend Zone")
+
+// ─── INFO TABLE ──────────────────────────────────────────────────────────────
+
+var table infoTbl = table.new(position.top_right, 2, 8,
+     bgcolor = color.new(color.black, 70), border_width = 1)
+
+if barstate.islast
+    table.cell(infoTbl, 0, 0, "Metric",         text_color = color.gray,  text_size = size.small)
+    table.cell(infoTbl, 1, 0, "Value",           text_color = color.gray,  text_size = size.small)
+    table.cell(infoTbl, 0, 1, "Net Profit",      text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 1, 1, str.tostring(math.round(strategy.netprofit, 2)),
+         text_color = strategy.netprofit >= 0 ? color.lime : color.red, text_size = size.small)
+    table.cell(infoTbl, 0, 2, "Win Rate",        text_color = color.white, text_size = size.small)
+    winRate = strategy.closedtrades > 0
+         ? math.round(strategy.wintrades / strategy.closedtrades * 100, 1) : 0.0
+    table.cell(infoTbl, 1, 2, str.tostring(winRate) + "%",
+         text_color = winRate >= 50 ? color.lime : color.orange, text_size = size.small)
+    table.cell(infoTbl, 0, 3, "Total Trades",    text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 1, 3, str.tostring(strategy.closedtrades),
+         text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 0, 4, "Profit Factor",   text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 1, 4, str.tostring(math.round(strategy.grossprofit /
+         math.max(math.abs(strategy.grossloss), 1), 2)),
+         text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 0, 5, "Max Drawdown",    text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 1, 5, str.tostring(math.round(strategy.max_drawdown, 2)),
+         text_color = color.orange, text_size = size.small)
+    table.cell(infoTbl, 0, 6, "SL × ATR",        text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 1, 6, str.tostring(i_slMult) + "×",
+         text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 0, 7, "TP × ATR",        text_color = color.white, text_size = size.small)
+    table.cell(infoTbl, 1, 7, str.tostring(i_tpMult) + "×",
+         text_color = color.white, text_size = size.small)
