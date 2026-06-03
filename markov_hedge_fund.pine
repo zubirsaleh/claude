@@ -1,19 +1,19 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0
 // at https://mozilla.org/MPL/2.0/
 //
-// Markov Hedge Fund Method — Pine Script v5
-// ==========================================
+// Markov Hedge Fund Method  --  Pine Script v5
+// =============================================
 // Classifies the market into Bull / Sideways / Bear states using a rolling
-// cumulative return, builds a 3×3 transition-probability matrix over the
-// entire price history, and generates a directional signal:
+// cumulative return, builds a 3x3 transition-probability matrix over all
+// available price history, and generates a directional signal:
 //
-//   Signal = P(next = Bull | current state) − P(next = Bear | current state)
+//   Signal = P(next = Bull | today) - P(next = Bear | today)
 //
-//   Signal > 0 → LONG   (size ∝ magnitude)
-//   Signal < 0 → SHORT  (size ∝ magnitude)
-//   Signal = 0 → close all positions
+//   Signal > 0  ->  LONG   (size proportional to magnitude)
+//   Signal < 0  ->  SHORT  (size proportional to magnitude)
+//   Signal = 0  ->  close all positions
 //
-// A live transition-matrix table is shown in the top-right corner.
+// Green flag = new entry  |  Red flag = position closed to neutral
 
 //@version=5
 strategy("Markov Hedge Fund Method",
@@ -25,67 +25,55 @@ strategy("Markov Hedge Fund Method",
      commission_type   = strategy.commission.percent,
      commission_value  = 0.05)
 
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 // UTILITY FUNCTIONS
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 safe_div(n, d) => d > 0.0 ? n / d : 0.0
 to_pct(v)      => str.tostring(math.round(v * 100.0, 1)) + "%"
 
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 // INPUTS
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
-lookback = input.int  (20,   "Lookback Bars",
+lookback = input.int(20, "Lookback Bars",
      minval  = 5,
-     tooltip = "Number of bars used to compute the cumulative return that labels each state.",
-     group   = "State Classification")
+     group   = "State Classification",
+     tooltip = "Number of bars used to compute the cumulative return that labels each state.")
 
-bull_pct = input.float(5.0,  "Bull Threshold (%)",
+bull_pct = input.float(5.0, "Bull Threshold (%)",
      minval  = 0.1,
      step    = 0.5,
-     tooltip = "Cumulative return ≥ this value → Bull state.",
-     group   = "State Classification") / 100.0
+     group   = "State Classification",
+     tooltip = "Cumulative return >= this value labels the bar as Bull.") / 100.0
 
-bear_pct = input.float(5.0,  "Bear Threshold (%)",
+bear_pct = input.float(5.0, "Bear Threshold (%)",
      minval  = 0.1,
      step    = 0.5,
-     tooltip = "Cumulative return ≤ negative this value → Bear state.",
-     group   = "State Classification") / 100.0
+     group   = "State Classification",
+     tooltip = "Cumulative return <= negative this value labels the bar as Bear.") / 100.0
 
-show_tbl = input.bool(true,  "Show Transition Matrix", group = "Display")
-show_bg  = input.bool(true,  "Colour Background by State", group = "Display")
+show_tbl = input.bool(true, "Show Transition Matrix", group = "Display")
+show_bg  = input.bool(true, "Colour Background by State", group = "Display")
 
-// ══════════════════════════════════════════════════════════════════════════════
-// STATE CLASSIFICATION
-//   0 = Bull  |  1 = Sideways  |  2 = Bear
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// STATE CLASSIFICATION   0 = Bull  |  1 = Sideways  |  2 = Bear
+// =============================================================================
 
 cum_ret = (close - close[lookback]) / close[lookback]
 
-state = cum_ret >=  bull_pct ? 0 :
-        cum_ret <= -bear_pct ? 2 : 1
-
-// Previous bar's state (default sideways during the warm-up period)
+state  = cum_ret >= bull_pct ? 0 : cum_ret <= -bear_pct ? 2 : 1
 s_prev = nz(state[1], 1)
 
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 // TRANSITION COUNT ACCUMULATION
 //
-// Flat 3×3 array — cell index = (from_state × 3) + to_state
+// Flat 3x3 array  --  cell index = (from_state * 3) + to_state
 //
-//   Index  Meaning
-//   ─────  ───────
-//     0    Bull  → Bull
-//     1    Bull  → Sideways
-//     2    Bull  → Bear
-//     3    Side  → Bull
-//     4    Side  → Sideways
-//     5    Side  → Bear
-//     6    Bear  → Bull
-//     7    Bear  → Sideways
-//     8    Bear  → Bear
-// ══════════════════════════════════════════════════════════════════════════════
+//   0  Bull -> Bull       3  Side -> Bull       6  Bear -> Bull
+//   1  Bull -> Side       4  Side -> Side       7  Bear -> Side
+//   2  Bull -> Bear       5  Side -> Bear       8  Bear -> Bear
+// =============================================================================
 
 var float[] tc = array.new_float(9, 0.0)
 
@@ -93,40 +81,38 @@ if barstate.isconfirmed
     int k = s_prev * 3 + state
     array.set(tc, k, array.get(tc, k) + 1.0)
 
-// Row totals (denominator for each origin state)
-r0 = array.get(tc,0) + array.get(tc,1) + array.get(tc,2)   // from Bull
-r1 = array.get(tc,3) + array.get(tc,4) + array.get(tc,5)   // from Sideways
-r2 = array.get(tc,6) + array.get(tc,7) + array.get(tc,8)   // from Bear
+// Row totals
+r0 = array.get(tc,0) + array.get(tc,1) + array.get(tc,2)
+r1 = array.get(tc,3) + array.get(tc,4) + array.get(tc,5)
+r2 = array.get(tc,6) + array.get(tc,7) + array.get(tc,8)
 
 // Conditional probabilities  P(next_state | current_state)
-p_bb = safe_div(array.get(tc,0), r0)    // Bull    → Bull
-p_bs = safe_div(array.get(tc,1), r0)    // Bull    → Sideways
-p_bB = safe_div(array.get(tc,2), r0)    // Bull    → Bear
+p_bb = safe_div(array.get(tc,0), r0)
+p_bs = safe_div(array.get(tc,1), r0)
+p_bB = safe_div(array.get(tc,2), r0)
 
-p_sb = safe_div(array.get(tc,3), r1)    // Sideways → Bull
-p_ss = safe_div(array.get(tc,4), r1)    // Sideways → Sideways
-p_sB = safe_div(array.get(tc,5), r1)    // Sideways → Bear
+p_sb = safe_div(array.get(tc,3), r1)
+p_ss = safe_div(array.get(tc,4), r1)
+p_sB = safe_div(array.get(tc,5), r1)
 
-p_Bb = safe_div(array.get(tc,6), r2)    // Bear    → Bull
-p_Bs = safe_div(array.get(tc,7), r2)    // Bear    → Sideways
-p_BB = safe_div(array.get(tc,8), r2)    // Bear    → Bear
+p_Bb = safe_div(array.get(tc,6), r2)
+p_Bs = safe_div(array.get(tc,7), r2)
+p_BB = safe_div(array.get(tc,8), r2)
 
-// ══════════════════════════════════════════════════════════════════════════════
-// SIGNAL  =  P(next = Bull | today)  −  P(next = Bear | today)
-//   Range: −1 to +1
-//   Positive → LONG conviction    Negative → SHORT conviction
-//   Magnitude → suggested position size as % of equity
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// SIGNAL  =  P(next = Bull | today)  -  P(next = Bear | today)
+//   Range: -1 to +1
+// =============================================================================
 
 signal = state == 0 ? p_bb - p_bB :
          state == 1 ? p_sb - p_sB :
                       p_Bb - p_BB
 
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 // STRATEGY EXECUTION
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
-qty_pct = math.abs(signal) * 100.0      // 0–100 % of equity
+qty_pct = math.abs(signal) * 100.0
 
 if signal > 0.0
     strategy.entry("Long",  strategy.long,  qty_percent = qty_pct)
@@ -135,43 +121,37 @@ if signal < 0.0
 if signal == 0.0
     strategy.close_all()
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ENTRY / EXIT DETECTION
-//   prev_sig carries the last confirmed signal so na warm-up bars are safe.
-//   Entry  — signal changes sign (new long or new short position)
-//   Exit   — signal returns to 0 (position closed to neutral)
-//   Reversal (long→short or short→long) shows a green flag because it is
-//   primarily a new entry event; the implicit exit is shown by the new
-//   histogram direction.
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// ENTRY / EXIT FLAGS
+//   Green flag  ->  new position opened (any direction)
+//   Red flag    ->  position closed to neutral (signal = 0)
+//   Reversals show only a green flag (new entry) -- histogram colour change
+//   makes the prior exit visually obvious.
+// =============================================================================
 
 prev_sig    = nz(signal[1])
-long_entry  = signal > 0.0 and prev_sig <= 0.0   // transitioning into long
-short_entry = signal < 0.0 and prev_sig >= 0.0   // transitioning into short
+long_entry  = signal > 0.0 and prev_sig <= 0.0
+short_entry = signal < 0.0 and prev_sig >= 0.0
 any_entry   = long_entry or short_entry
-any_exit    = signal == 0.0 and prev_sig != 0.0  // position closed to neutral
+any_exit    = signal == 0.0 and prev_sig != 0.0
 
-// Green flag — plotted at the signal bar's y-level on entry bars
-plotshape(any_entry ? signal : na,
-     title     = "Entry Flag",
-     style     = shape.flag,
-     location  = location.absolute,
-     color     = color.new(color.green, 0),
-     textcolor = color.white,
-     size      = size.small)
+if any_entry
+    label.new(bar_index, signal, "",
+         color     = color.new(color.green, 0),
+         textcolor = color.white,
+         style     = label.style_flag,
+         size      = size.small)
 
-// Red flag — plotted at the previous signal's y-level on exit bars
-plotshape(any_exit ? prev_sig : na,
-     title     = "Exit Flag",
-     style     = shape.flag,
-     location  = location.absolute,
-     color     = color.new(color.red, 0),
-     textcolor = color.white,
-     size      = size.small)
+if any_exit
+    label.new(bar_index, prev_sig, "",
+         color     = color.new(color.red, 0),
+         textcolor = color.white,
+         style     = label.style_flag,
+         size      = size.small)
 
-// ══════════════════════════════════════════════════════════════════════════════
-// VISUALS — signal pane + state background
-// ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// VISUALS  --  signal histogram + state background
+// =============================================================================
 
 sig_col  = signal > 0.0 ? color.green :
            signal < 0.0 ? color.red   : color.gray
@@ -189,19 +169,17 @@ hline(0, "Zero",
 
 bgcolor(show_bg ? state_bg : na, title = "State Background")
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TRANSITION MATRIX TABLE  (top-right, updated on last bar)
+// =============================================================================
+// TRANSITION MATRIX TABLE  (top-right corner, last bar only)
 //
-//  Layout (column × row):
-//
-//            │ ▲ Bull  │ → Side  │ ▼ Bear  │ Signal │
-//  ──────────┼─────────┼─────────┼─────────┼────────┤
-//  ▲ Bull    │  p_bb   │  p_bs   │  p_bB   │  sig_b │
-//  → Side    │  p_sb   │  p_ss   │  p_sB   │  sig_s │
-//  ▼ Bear    │  p_Bb   │  p_Bs   │  p_BB   │  sig_B │
-//  ──────────┴─────────┴─────────┴─────────┴────────┘
-//  Now: XX   │                             │ LONG/SHORT XX%
-// ══════════════════════════════════════════════════════════════════════════════
+//   From \ To | Bull  | Side  | Bear  | Signal
+//   ----------+-------+-------+-------+--------
+//   Bull      | p_bb  | p_bs  | p_bB  | sig_b
+//   Side      | p_sb  | p_ss  | p_sB  | sig_s
+//   Bear      | p_Bb  | p_Bs  | p_BB  | sig_B
+//   ----------+-------+-------+-------+--------
+//   Now: XX   |                       | LONG/SHORT XX%
+// =============================================================================
 
 var table mat = table.new(
      position     = position.top_right,
@@ -213,27 +191,27 @@ var table mat = table.new(
 
 if show_tbl and barstate.islast
 
-    // ── Header row ───────────────────────────────────────────────────────────
-    table.cell(mat, 0, 0, "From↓ To→",
+    // Header row
+    table.cell(mat, 0, 0, "From / To",
          text_color = color.white,  text_size = size.small, text_halign = text.align_center)
-    table.cell(mat, 1, 0, "▲ Bull",
+    table.cell(mat, 1, 0, "Bull",
          text_color = color.green,  text_size = size.small, text_halign = text.align_center)
-    table.cell(mat, 2, 0, "→ Side",
+    table.cell(mat, 2, 0, "Side",
          text_color = color.silver, text_size = size.small, text_halign = text.align_center)
-    table.cell(mat, 3, 0, "▼ Bear",
+    table.cell(mat, 3, 0, "Bear",
          text_color = color.red,    text_size = size.small, text_halign = text.align_center)
     table.cell(mat, 4, 0, "Signal",
          text_color = color.yellow, text_size = size.small, text_halign = text.align_center)
 
-    // ── Row labels ───────────────────────────────────────────────────────────
-    table.cell(mat, 0, 1, "▲ Bull",
+    // Row labels
+    table.cell(mat, 0, 1, "Bull",
          text_color = color.green,  text_size = size.small, text_halign = text.align_center)
-    table.cell(mat, 0, 2, "→ Side",
+    table.cell(mat, 0, 2, "Side",
          text_color = color.silver, text_size = size.small, text_halign = text.align_center)
-    table.cell(mat, 0, 3, "▼ Bear",
+    table.cell(mat, 0, 3, "Bear",
          text_color = color.red,    text_size = size.small, text_halign = text.align_center)
 
-    // ── Bull row ─────────────────────────────────────────────────────────────
+    // Bull row
     table.cell(mat, 1, 1, to_pct(p_bb),
          text_color = color.white, text_size = size.small, text_halign = text.align_center)
     table.cell(mat, 2, 1, to_pct(p_bs),
@@ -244,7 +222,7 @@ if show_tbl and barstate.islast
          text_color = p_bb - p_bB >= 0.0 ? color.green : color.red,
          text_size  = size.small, text_halign = text.align_center)
 
-    // ── Sideways row ─────────────────────────────────────────────────────────
+    // Sideways row
     table.cell(mat, 1, 2, to_pct(p_sb),
          text_color = color.white, text_size = size.small, text_halign = text.align_center)
     table.cell(mat, 2, 2, to_pct(p_ss),
@@ -255,7 +233,7 @@ if show_tbl and barstate.islast
          text_color = p_sb - p_sB >= 0.0 ? color.green : color.red,
          text_size  = size.small, text_halign = text.align_center)
 
-    // ── Bear row ─────────────────────────────────────────────────────────────
+    // Bear row
     table.cell(mat, 1, 3, to_pct(p_Bb),
          text_color = color.white, text_size = size.small, text_halign = text.align_center)
     table.cell(mat, 2, 3, to_pct(p_Bs),
@@ -266,11 +244,10 @@ if show_tbl and barstate.islast
          text_color = p_Bb - p_BB >= 0.0 ? color.green : color.red,
          text_size  = size.small, text_halign = text.align_center)
 
-    // ── Current state + live signal ───────────────────────────────────────────
-    now_lbl = state == 0 ? "▲ BULL" : state == 2 ? "▼ BEAR" : "→ SIDE"
+    // Current state + live signal
+    now_lbl = state == 0 ? "BULL" : state == 2 ? "BEAR" : "SIDE"
     now_col = state == 0 ? color.green : state == 2 ? color.red : color.silver
-
-    sig_str = signal > 0.0 ? "LONG  " + to_pct(signal)          :
+    sig_str = signal > 0.0 ? "LONG  " + to_pct(signal) :
               signal < 0.0 ? "SHORT " + to_pct(math.abs(signal)) : "NEUTRAL"
     sig_c   = signal >= 0.0 ? color.green : color.red
 
