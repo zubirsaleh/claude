@@ -33,16 +33,17 @@ class RegimeParams:
 
 
 REGIMES: List[RegimeParams] = [
-    RegimeParams("Bull",   daily_mean=0.0008, daily_std=0.008),
+    RegimeParams("Bull",   daily_mean=0.0015, daily_std=0.007),   # stronger, tighter bull
     RegimeParams("Bear",   daily_mean=-0.0003, daily_std=0.016),
     RegimeParams("Crisis", daily_mean=-0.002,  daily_std=0.030),
 ]
 
 # Transition matrix P[i][j] = prob of moving from regime i to regime j
+# Long-bullish: Bull is very sticky; Bear/Crisis escape back to Bull quickly
 TRANSITION: List[List[float]] = [
-    [0.97, 0.02, 0.01],   # from Bull
-    [0.05, 0.90, 0.05],   # from Bear
-    [0.02, 0.18, 0.80],   # from Crisis
+    [0.992, 0.006, 0.002],  # from Bull  — stays bull ~99% of days
+    [0.15,  0.80,  0.05],   # from Bear  — 15% chance of recovery each day
+    [0.05,  0.20,  0.75],   # from Crisis — escapes faster
 ]
 
 # Portfolio equity allocation per detected regime (rest goes to cash/bonds)
