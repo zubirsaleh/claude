@@ -45,7 +45,7 @@ s_prev  = nz(state[1], 1)
 var float[] tc = array.new_float(9, 0.0)
 
 if barstate.isconfirmed
-    int k = s_prev * 3 + state
+    k = s_prev * 3 + state
     array.set(tc, k, array.get(tc, k) + 1.0)
 
 r0 = array.get(tc, 0) + array.get(tc, 1) + array.get(tc, 2)
@@ -72,12 +72,12 @@ signal = state == 0 ? p_bb - p_bB : state == 1 ? p_sb - p_sB : p_Bb - p_BB
 // STRATEGY EXECUTION
 // ============================================================
 
-qty_pct = math.abs(signal) * 100.0
+entry_qty = math.abs(signal) * strategy.equity / close
 
 if signal > 0.0
-    strategy.entry("Long", strategy.long, qty_percent=qty_pct)
+    strategy.entry("Long", strategy.long, qty=entry_qty)
 if signal < 0.0
-    strategy.entry("Short", strategy.short, qty_percent=qty_pct)
+    strategy.entry("Short", strategy.short, qty=entry_qty)
 if signal == 0.0
     strategy.close_all()
 
