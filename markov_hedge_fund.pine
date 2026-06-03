@@ -136,6 +136,40 @@ if signal == 0.0
     strategy.close_all()
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ENTRY / EXIT DETECTION
+//   prev_sig carries the last confirmed signal so na warm-up bars are safe.
+//   Entry  — signal changes sign (new long or new short position)
+//   Exit   — signal returns to 0 (position closed to neutral)
+//   Reversal (long→short or short→long) shows a green flag because it is
+//   primarily a new entry event; the implicit exit is shown by the new
+//   histogram direction.
+// ══════════════════════════════════════════════════════════════════════════════
+
+prev_sig    = nz(signal[1])
+long_entry  = signal > 0.0 and prev_sig <= 0.0   // transitioning into long
+short_entry = signal < 0.0 and prev_sig >= 0.0   // transitioning into short
+any_entry   = long_entry or short_entry
+any_exit    = signal == 0.0 and prev_sig != 0.0  // position closed to neutral
+
+// Green flag — plotted at the signal bar's y-level on entry bars
+plotshape(any_entry ? signal : na,
+     title     = "Entry Flag",
+     style     = shape.flag,
+     location  = location.absolute,
+     color     = color.new(color.green, 0),
+     textcolor = color.white,
+     size      = size.small)
+
+// Red flag — plotted at the previous signal's y-level on exit bars
+plotshape(any_exit ? prev_sig : na,
+     title     = "Exit Flag",
+     style     = shape.flag,
+     location  = location.absolute,
+     color     = color.new(color.red, 0),
+     textcolor = color.white,
+     size      = size.small)
+
+// ══════════════════════════════════════════════════════════════════════════════
 // VISUALS — signal pane + state background
 // ══════════════════════════════════════════════════════════════════════════════
 
