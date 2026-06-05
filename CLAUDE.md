@@ -5,46 +5,58 @@ This file provides guidance to AI assistants (Claude and others) working in this
 ## Repository Overview
 
 **Repo:** `zubirsaleh/claude`
-**Status:** Initial setup — no source files yet.
+**Product:** TradingView → Claude → Telegram analyst bot.
 
-Update this section as the project takes shape: describe what the product does, its primary users, and the problem it solves.
+The user sends a plain-language trading query to a Telegram bot. The bot routes it to Claude (via Anthropic API), which calls TradingView tools to fetch live OHLCV data, compute technical indicators, and detect candlestick patterns, then returns a structured position analysis back to Telegram.
+
+A standalone MCP server (`mcp_server/server.py`) exposes the same tools to Claude Code for direct use in the CLI/desktop without the Telegram layer.
 
 ## Project Structure
 
 ```
 claude/
-├── CLAUDE.md          # This file
+├── main.py                    # Entry point — starts Telegram bot
+├── config.py                  # Env-var config
+├── requirements.txt
+├── .env.example               # Required env vars template
+├── .claude/
+│   └── settings.json          # MCP server wiring for Claude Code
+├── bot/
+│   ├── claude_handler.py      # Anthropic API + tool-use loop + history
+│   └── telegram_bot.py        # Telegram handlers
+├── mcp_server/
+│   └── server.py              # FastMCP server (TradingView tools)
+└── trading/
+    ├── fetcher.py             # tvdatafeed OHLCV downloader
+    ├── indicators.py          # pandas-ta RSI/MACD/BB/EMA/ATR/Stoch
+    ├── patterns.py            # Candlestick pattern detection
+    └── analysis.py            # Combined full_analysis() + TV rating
 ```
-
-Update this tree as directories and files are added.
 
 ## Development Setup
 
-Document the steps needed to get a local development environment running:
-
 ```bash
-# Example — replace with actual commands
 git clone https://github.com/zubirsaleh/claude.git
 cd claude
-# install dependencies, e.g.:
-# npm install  /  pip install -r requirements.txt  /  bundle install
+pip install -r requirements.txt
+cp .env.example .env          # fill in the four required vars
+python main.py                # starts the Telegram bot
 ```
 
 ### Prerequisites
 
-List required tools and versions here (Node, Python, Docker, etc.).
+- Python 3.10+
+- A Telegram bot token (from [@BotFather](https://t.me/BotFather))
+- An Anthropic API key (console.anthropic.com)
+- A TradingView account (free tier works; credentials optional but unlock more data)
 
 ## Common Commands
 
 | Task | Command |
 |------|---------|
-| Install deps | `<command>` |
-| Run dev server | `<command>` |
-| Run tests | `<command>` |
-| Lint / type-check | `<command>` |
-| Build for production | `<command>` |
-
-Fill in the right-hand column once the project has a build system.
+| Install deps | `pip install -r requirements.txt` |
+| Start Telegram bot | `python main.py` |
+| Start MCP server only | `python mcp_server/server.py` |
 
 ## Git Workflow
 
@@ -81,9 +93,14 @@ List required environment variables and where to get them:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `EXAMPLE_API_KEY` | API key for Example service | Yes |
+| `TELEGRAM_BOT_TOKEN` | Token from @BotFather | Yes |
+| `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs | Yes |
+| `ANTHROPIC_API_KEY` | Anthropic console API key | Yes |
+| `TRADINGVIEW_USERNAME` | TradingView login email | No |
+| `TRADINGVIEW_PASSWORD` | TradingView password | No |
+| `MAX_HISTORY` | Conversation turns kept in memory (default 20) | No |
 
-Never commit real secrets. Use `.env.local` (gitignored) for local values.
+Never commit real secrets. Copy `.env.example` → `.env` and fill it in locally.
 
 ## AI Assistant Guidelines
 
@@ -101,9 +118,8 @@ Guidelines specifically for Claude Code and other AI assistants:
 
 ## Architecture Decisions
 
-Record significant architectural choices here as the project grows. Each entry should note: *what* was decided, *why*, and *what was rejected*.
+> **2026-06-05 — Single-process bot with inline tool execution**
+> The Telegram bot calls Claude's tool-use API synchronously in a thread pool (not as a separate MCP subprocess). This keeps deployment simple (one `python main.py`). The MCP server (`mcp_server/server.py`) is a separate entry point for Claude Code CLI/Desktop users who want to query TradingView directly without the bot.
 
-Example format:
-
-> **2026-05-25 — Chose X over Y**
-> Reason: X provides Z because … Y was rejected because …
+> **2026-06-05 — tvdatafeed for OHLCV + tradingview-ta for TA ratings**
+> `tvdatafeed` provides raw OHLCV history over TradingView's WebSocket. `tradingview-ta` scrapes TradingView's screener for the aggregated BUY/SELL/NEUTRAL rating. Both are unofficial but widely used. `pandas-ta` handles all local indicator maths so the bot works even when TV screener is unavailable.
