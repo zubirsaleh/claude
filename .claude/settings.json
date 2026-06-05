@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tradingview": {
+      "command": "python",
+      "args": ["mcp_server/server.py"],
+      "env": {
+        "TRADINGVIEW_USERNAME": "${TRADINGVIEW_USERNAME}",
+        "TRADINGVIEW_PASSWORD": "${TRADINGVIEW_PASSWORD}"
+      }
+    }
+  }
+}
