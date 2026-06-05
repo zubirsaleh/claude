@@ -1,0 +1,49 @@
+services:
+  oanda-service:
+    build:
+      context: .
+      dockerfile: oanda_service/Dockerfile
+    container_name: xauusd-oanda-service
+    env_file: .env
+    environment:
+      - OANDA_SERVICE_URL=http://oanda-service:8001
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8001/health').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  analysis-service:
+    build:
+      context: .
+      dockerfile: analysis_service/Dockerfile
+    container_name: xauusd-analysis-service
+    env_file: .env
+    environment:
+      - OANDA_SERVICE_URL=http://oanda-service:8001
+    ports:
+      - "8000:8000"
+    depends_on:
+      - oanda-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: telegram_bot/Dockerfile
+    container_name: xauusd-telegram-bot
+    env_file: .env
+    environment:
+      - ANALYSIS_SERVICE_URL=http://analysis-service:8000
+      - OANDA_SERVICE_URL=http://oanda-service:8001
+    depends_on:
+      - analysis-service
+    restart: unless-stopped
