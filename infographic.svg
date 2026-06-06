@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 740" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+
+  <!-- Background -->
+  <rect width="960" height="740" fill="#0f1117" rx="16"/>
+
+  <!-- Title -->
+  <text x="480" y="44" text-anchor="middle" font-size="22" font-weight="700" fill="#e2e8f0" letter-spacing="0.5">TradingView · Claude · Telegram — VPS Architecture</text>
+  <text x="480" y="66" text-anchor="middle" font-size="13" fill="#64748b">Hostinger VPS  ·  Single Python process  ·  python main.py</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- EXTERNAL SERVICES ROW (top) -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <!-- Telegram Cloud -->
+  <rect x="40" y="95" width="170" height="90" rx="12" fill="#1a2035" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="125" y="124" text-anchor="middle" font-size="11" fill="#93c5fd" font-weight="600" letter-spacing="1">TELEGRAM CLOUD</text>
+  <text x="125" y="144" text-anchor="middle" font-size="12" fill="#e2e8f0">api.telegram.org</text>
+  <text x="125" y="163" text-anchor="middle" font-size="10.5" fill="#64748b">Bot API — HTTPS/443</text>
+  <text x="125" y="178" text-anchor="middle" font-size="10.5" fill="#64748b">Long-poll or Webhook</text>
+
+  <!-- User / Phone -->
+  <rect x="40" y="210" width="170" height="80" rx="12" fill="#1a2035" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="125" y="236" text-anchor="middle" font-size="11" fill="#86efac" font-weight="600" letter-spacing="1">YOUR TELEGRAM APP</text>
+  <text x="125" y="258" text-anchor="middle" font-size="12" fill="#e2e8f0">User (you)</text>
+  <text x="125" y="276" text-anchor="middle" font-size="10.5" fill="#64748b">Phone / Desktop / Web</text>
+
+  <!-- Anthropic Claude API -->
+  <rect x="375" y="95" width="210" height="90" rx="12" fill="#1a2035" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="480" y="124" text-anchor="middle" font-size="11" fill="#fcd34d" font-weight="600" letter-spacing="1">ANTHROPIC API</text>
+  <text x="480" y="144" text-anchor="middle" font-size="12" fill="#e2e8f0">api.anthropic.com</text>
+  <text x="480" y="163" text-anchor="middle" font-size="10.5" fill="#64748b">Claude Opus 4  ·  HTTPS/443</text>
+  <text x="480" y="178" text-anchor="middle" font-size="10.5" fill="#64748b">Tool-use loop (agentic)</text>
+
+  <!-- TradingView -->
+  <rect x="750" y="95" width="170" height="90" rx="12" fill="#1a2035" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="835" y="120" text-anchor="middle" font-size="11" fill="#a5b4fc" font-weight="600" letter-spacing="1">TRADINGVIEW</text>
+  <text x="835" y="140" text-anchor="middle" font-size="10.5" fill="#64748b">tvdatafeed</text>
+  <text x="835" y="156" text-anchor="middle" font-size="10.5" fill="#64748b">WebSocket — OHLCV data</text>
+  <text x="835" y="172" text-anchor="middle" font-size="10.5" fill="#64748b">tradingview-ta</text>
+  <text x="835" y="188" text-anchor="middle" font-size="10.5" fill="#64748b">HTTPS — TA ratings</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- HOSTINGER VPS BOX -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <rect x="235" y="310" width="720" height="390" rx="16" fill="#0d1525" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <rect x="260" y="304" width="195" height="24" rx="6" fill="#1e293b"/>
+  <text x="358" y="321" text-anchor="middle" font-size="11.5" fill="#94a3b8" font-weight="600" letter-spacing="1.5">HOSTINGER VPS  (Ubuntu)</text>
+
+  <!-- ── main.py process box ── -->
+  <rect x="255" y="340" width="680" height="340" rx="12" fill="#111827" stroke="#1e3a5f" stroke-width="1.5"/>
+  <rect x="275" y="334" width="155" height="22" rx="5" fill="#1e3a5f"/>
+  <text x="353" y="349" text-anchor="middle" font-size="11" fill="#7dd3fc" font-weight="600" letter-spacing="1">python main.py</text>
+
+  <!-- telegram_bot.py -->
+  <rect x="275" y="365" width="190" height="120" rx="10" fill="#1a2035" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="370" y="390" text-anchor="middle" font-size="11" fill="#93c5fd" font-weight="700">telegram_bot.py</text>
+  <text x="370" y="410" text-anchor="middle" font-size="10" fill="#64748b">python-telegram-bot</text>
+  <line x1="290" y1="422" x2="450" y2="422" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="370" y="438" text-anchor="middle" font-size="10" fill="#94a3b8">/start  /clear  /help</text>
+  <text x="370" y="454" text-anchor="middle" font-size="10" fill="#94a3b8">handle_message()</text>
+  <text x="370" y="470" text-anchor="middle" font-size="10" fill="#94a3b8">Long-poll loop  (HTTPS)</text>
+
+  <!-- claude_handler.py -->
+  <rect x="490" y="365" width="200" height="120" rx="10" fill="#1a2035" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="590" y="390" text-anchor="middle" font-size="11" fill="#fcd34d" font-weight="700">claude_handler.py</text>
+  <text x="590" y="410" text-anchor="middle" font-size="10" fill="#64748b">anthropic SDK</text>
+  <line x1="505" y1="422" x2="675" y2="422" stroke="#2d2a1e" stroke-width="1"/>
+  <text x="590" y="438" text-anchor="middle" font-size="10" fill="#94a3b8">Tool-use agentic loop</text>
+  <text x="590" y="454" text-anchor="middle" font-size="10" fill="#94a3b8">Per-user history (RAM)</text>
+  <text x="590" y="470" text-anchor="middle" font-size="10" fill="#94a3b8">_execute_tool()</text>
+
+  <!-- trading/ modules -->
+  <rect x="490" y="505" width="200" height="110" rx="10" fill="#1a2035" stroke="#6366f1" stroke-width="1.2"/>
+  <text x="590" y="530" text-anchor="middle" font-size="11" fill="#a5b4fc" font-weight="700">trading/ modules</text>
+  <line x1="505" y1="540" x2="675" y2="540" stroke="#252547" stroke-width="1"/>
+  <text x="590" y="557" text-anchor="middle" font-size="10" fill="#94a3b8">fetcher.py  — OHLCV</text>
+  <text x="590" y="573" text-anchor="middle" font-size="10" fill="#94a3b8">indicators.py — RSI/MACD/BB</text>
+  <text x="590" y="589" text-anchor="middle" font-size="10" fill="#94a3b8">patterns.py — candle patterns</text>
+  <text x="590" y="605" text-anchor="middle" font-size="10" fill="#94a3b8">analysis.py — full_analysis()</text>
+
+  <!-- .env config -->
+  <rect x="720" y="505" width="185" height="110" rx="10" fill="#131f1a" stroke="#16a34a" stroke-width="1.2"/>
+  <text x="813" y="530" text-anchor="middle" font-size="11" fill="#86efac" font-weight="700">.env  (secrets)</text>
+  <line x1="733" y1="540" x2="893" y2="540" stroke="#1a2e1f" stroke-width="1"/>
+  <text x="813" y="556" text-anchor="middle" font-size="10" fill="#94a3b8">TELEGRAM_BOT_TOKEN</text>
+  <text x="813" y="572" text-anchor="middle" font-size="10" fill="#94a3b8">ANTHROPIC_API_KEY</text>
+  <text x="813" y="588" text-anchor="middle" font-size="10" fill="#94a3b8">TRADINGVIEW_USERNAME</text>
+  <text x="813" y="604" text-anchor="middle" font-size="10" fill="#94a3b8">TRADINGVIEW_PASSWORD</text>
+
+  <!-- systemd badge -->
+  <rect x="720" y="365" width="185" height="120" rx="10" fill="#131a1f" stroke="#0ea5e9" stroke-width="1.2"/>
+  <text x="813" y="390" text-anchor="middle" font-size="11" fill="#7dd3fc" font-weight="700">systemd service</text>
+  <line x1="733" y1="400" x2="893" y2="400" stroke="#1a2535" stroke-width="1"/>
+  <text x="813" y="420" text-anchor="middle" font-size="10" fill="#94a3b8">Keeps process alive</text>
+  <text x="813" y="438" text-anchor="middle" font-size="10" fill="#94a3b8">Auto-restart on crash</text>
+  <text x="813" y="456" text-anchor="middle" font-size="10" fill="#94a3b8">Starts at boot</text>
+  <text x="813" y="476" text-anchor="middle" font-size="10" fill="#64748b">systemctl enable bot</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- ARROWS & FLOW LABELS -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <!-- 1. User → Telegram Cloud -->
+  <line x1="125" y1="210" x2="125" y2="185" stroke="#22c55e" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="90" y="202" font-size="9.5" fill="#4ade80">① send message</text>
+
+  <!-- 2. Telegram Cloud ↔ VPS (bot long-polls) -->
+  <!-- down from Telegram Cloud to telegram_bot.py -->
+  <line x1="210" y1="140" x2="370" y2="140" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="370" y1="140" x2="370" y2="365" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-blue)"/>
+  <text x="272" y="133" font-size="9.5" fill="#60a5fa">② updates (long-poll)</text>
+
+  <!-- bot replies back to Telegram Cloud -->
+  <path d="M 275 425 Q 175 425 125 310 Q 125 185 210 150" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-green)"/>
+  <text x="42" y="370" font-size="9.5" fill="#4ade80">⑦ reply text</text>
+
+  <!-- 3. telegram_bot → claude_handler -->
+  <line x1="465" y1="425" x2="490" y2="425" stroke="#f59e0b" stroke-width="1.8" marker-end="url(#arr-amber)"/>
+  <text x="464" y="415" font-size="9" fill="#fcd34d">③ chat(user_id, msg)</text>
+
+  <!-- 4. claude_handler → Anthropic API -->
+  <line x1="590" y1="365" x2="530" y2="185" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-amber)"/>
+  <text x="540" y="270" font-size="9.5" fill="#fcd34d">④ messages.create()</text>
+
+  <!-- 5. Claude → tool_use → back to handler (same process) -->
+  <path d="M 680 425 Q 740 425 740 455 Q 740 490 690 505" fill="none" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr-amber)"/>
+  <text x="694" y="460" font-size="9.5" fill="#fcd34d">⑤ tool_use</text>
+
+  <!-- 6. trading/ → TradingView -->
+  <line x1="690" y1="560" x2="750" y2="200" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-indigo)"/>
+  <text x="710" y="380" font-size="9.5" fill="#a5b4fc">⑥ WS + HTTPS</text>
+
+  <!-- tool result back to claude_handler (same call stack) -->
+  <path d="M 490 540 Q 460 540 460 490 Q 460 470 490 460" fill="none" stroke="#6366f1" stroke-width="1.5" marker-end="url(#arr-indigo)"/>
+  <text x="342" y="510" font-size="9.5" fill="#a5b4fc">tool result (JSON)</text>
+
+  <!-- Anthropic response back -->
+  <path d="M 375 155 Q 350 155 350 250 Q 350 355 490 380" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-amber)"/>
+  <text x="252" y="250" font-size="9.5" fill="#fcd34d">⑧ final text</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- ARROW MARKERS -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <defs>
+    <marker id="arr-green"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/>
+    </marker>
+    <marker id="arr-blue"   markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/>
+    </marker>
+    <marker id="arr-amber"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+    </marker>
+    <marker id="arr-indigo" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- LEGEND (bottom) -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <rect x="40" y="655" width="880" height="70" rx="10" fill="#0d1525" stroke="#1e293b" stroke-width="1"/>
+  <text x="480" y="675" text-anchor="middle" font-size="11" fill="#64748b" font-weight="600" letter-spacing="1">SETUP STEPS ON HOSTINGER VPS</text>
+
+  <text x="60"  y="700" font-size="10" fill="#94a3b8">1. apt install python3-pip git</text>
+  <text x="60"  y="715" font-size="10" fill="#94a3b8">2. git clone … &amp;&amp; pip install -r requirements.txt</text>
+
+  <text x="270" y="700" font-size="10" fill="#94a3b8">3. cp .env.example .env  →  fill 4 vars</text>
+  <text x="270" y="715" font-size="10" fill="#94a3b8">4. python main.py  (test it works)</text>
+
+  <text x="500" y="700" font-size="10" fill="#94a3b8">5. Create systemd unit: ExecStart=python main.py</text>
+  <text x="500" y="715" font-size="10" fill="#94a3b8">6. systemctl enable --now tradingbot</text>
+
+  <text x="730" y="700" font-size="10" fill="#4ade80">No open inbound ports needed —</text>
+  <text x="730" y="715" font-size="10" fill="#4ade80">bot polls Telegram outbound only</text>
+
+</svg>
