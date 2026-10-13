@@ -4,14 +4,15 @@
 // A green flag is plotted (and an alert fires) when ALL of these are true:
 //   1. Daily trend   : EMA 8 above EMA 21 (last completed daily bar — no repaint)
 //   2. H1 trend      : EMA 50 above EMA 200
-//   3. RSI(6) ≤ 20   : on this bar or within the last N bars
+//   3. RSI(6) ≤ 20   : on this bar or within the last N bars (TradingView's built-in RSI defaults to 14 — set it to 6 to compare)
 //   4. Retracement   : price has pulled back ≥ 50% of the previous swing-low → swing-high move
+//                      (swing high = highest high of the last 50 bars, no confirmation delay)
 //   5. Confirmation  : bullish Engulfing / Hammer / Inverted Hammer on H1
 //   6. Touch         : candle touched EMA 50, EMA 200 or the ascending trendline (last N bars)
 //   7. Risk-Reward   : (swing high − entry) / (entry − stop) ≥ 1.5
 //
 // Alerts: Add alert → Condition = this strategy → "alert() function calls only".
-strategy("MTF Pullback Buy Setup", shorttitle = "MTF Pullback Buy", overlay = true,
+strategy("MTF Pullback Buy Setup", shorttitle = "MTF Pullback Buy", overlay = true, max_labels_count = 500,
      initial_capital = 10000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
      commission_type = strategy.commission.percent, commission_value = 0.05,
      process_orders_on_close = true)
@@ -29,7 +30,8 @@ rsiLevel    = input.float(20.0, "Oversold level (≤)",                        g
 rsiLookback = input.int(3,      "Oversold within last N bars",   minval = 0, group = grpRsi, tooltip = "0 = RSI must be oversold on the signal candle itself")
 
 grpSwing = "4 · Retracement"
-pivotLen   = input.int(5,       "Swing pivot strength (bars each side)", minval = 1, group = grpSwing)
+swingLen   = input.int(50,      "Previous move lookback (bars)",         minval = 5, group = grpSwing, tooltip = "Swing high = highest high in this window; swing low = lowest low in the same-length window before it")
+pivotLen   = input.int(3,       "Trendline pivot strength (bars each side)", minval = 1, group = grpSwing)
 minRetrace = input.float(50.0,  "Min retracement %",                     group = grpSwing)
 maxRetrace = input.float(100.0, "Max retracement %",                     group = grpSwing, tooltip = "Beyond 100% the swing low is broken and the up-move is invalid")
 
@@ -55,6 +57,8 @@ slAtrMult  = input.float(0.2, "Stop buffer below pullback low (× ATR)", minval 
 
 grpVis = "Display"
 showTable = input.bool(true, "Show checklist table", group = grpVis)
+showDebug = input.bool(true, "Label near-misses (which condition failed)", group = grpVis)
+debugMin  = input.int(5, "Near-miss: label bars with at least N of 7 met", minval = 1, maxval = 6, group = grpVis)
 
 // ───── 1. Daily trend (confirmed daily bar, non-repainting) ─────
 [dEmaFast, dEmaSlow] = request.security(syminfo.tickerid, "D",
@@ -71,40 +75,32 @@ rsi       = ta.rsi(close, rsiLen)
 rsiMin    = ta.lowest(rsi, rsiLookback + 1)
 rsiOk     = rsiMin <= rsiLevel
 
-// ───── 4. Swing structure & retracement ─────
-ph = ta.pivothigh(high, pivotLen, pivotLen)
+// ───── 4. Previous move & retracement ─────
+// Swing high = highest high of the last `swingLen` bars (no pivot-confirmation delay).
+// Swing low  = lowest low of the `swingLen` bars up to that high. Pullback low = lowest low since the high.
+hiOffset   = nz(-ta.highestbars(high, swingLen))
+lowestBack = ta.lowest(low, swingLen)
+legHigh    = high[hiOffset]
+legLow     = lowestBack[hiOffset]
+pullLow    = ta.lowest(low, hiOffset + 1)
+
+legRange   = legHigh - legLow
+retracePct = hiOffset > 0 and legRange > 0 ? (legHigh - pullLow) / legRange * 100 : na
+retraceOk  = not na(retracePct) and retracePct >= minRetrace and retracePct <= maxRetrace
+
+// Swing lows for the trendline (confirmed `pivotLen` bars later).
 pl = ta.pivotlow(low, pivotLen, pivotLen)
-lowSincePivot = ta.lowest(low, pivotLen)
 
 var float lastPL    = na
 var int   lastPLBar = na
 var float prevPL    = na
 var int   prevPLBar = na
-var float legLow    = na
-var float legHigh   = na
-var float pullLow   = na
 
 if not na(pl)
     prevPL    := lastPL
     prevPLBar := lastPLBar
     lastPL    := pl
     lastPLBar := bar_index - pivotLen
-
-if not na(ph)
-    legHigh := ph
-    legLow  := lastPL
-    pullLow := lowSincePivot
-else if not na(legHigh) and high > legHigh
-    // Price made a new high: the pullback is over, wait for the next swing high.
-    legHigh := na
-    legLow  := na
-    pullLow := na
-else if not na(pullLow)
-    pullLow := math.min(pullLow, low)
-
-legRange   = legHigh - legLow
-retracePct = not na(legRange) and legRange > 0 ? (legHigh - pullLow) / legRange * 100 : na
-retraceOk  = not na(retracePct) and retracePct >= minRetrace and retracePct <= maxRetrace
 
 // ───── 5. Bullish confirmation candle ─────
 body      = math.abs(close - open)
@@ -133,7 +129,7 @@ touchOk   = ta.highest(touchNow ? 1 : 0, touchLookback + 1) > 0
 // ───── 7. Risk-Reward ─────
 atr         = ta.atr(atrLen)
 entryPrice  = close
-stopPrice   = math.min(low, nz(pullLow, low)) - atr * slAtrMult
+stopPrice   = math.min(low, pullLow) - atr * slAtrMult
 targetPrice = legHigh
 risk        = entryPrice - stopPrice
 rr          = not na(targetPrice) and risk > 0 ? (targetPrice - entryPrice) / risk : na
@@ -141,6 +137,13 @@ rrOk        = not na(rr) and rr >= minRR
 
 // ───── Signal ─────
 buySignal = dailyTrend and h1Trend and rsiOk and retraceOk and candleOk and touchOk and rrOk
+
+metCount = (dailyTrend ? 1 : 0) + (h1Trend ? 1 : 0) + (rsiOk ? 1 : 0) + (retraceOk ? 1 : 0) + (candleOk ? 1 : 0) + (touchOk ? 1 : 0) + (rrOk ? 1 : 0)
+if showDebug and not buySignal and metCount >= debugMin and barstate.isconfirmed
+    missing = (dailyTrend ? "" : " 1") + (h1Trend ? "" : " 2") + (rsiOk ? "" : " 3") + (retraceOk ? "" : " 4") + (candleOk ? "" : " 5") + (touchOk ? "" : " 6") + (rrOk ? "" : " 7")
+    label.new(bar_index, low, str.tostring(metCount) + "/7\n✘" + missing, style = label.style_label_up, size = size.tiny,
+         color = color.new(color.orange, 30), textcolor = color.white,
+         tooltip = "RSI(6) " + str.tostring(rsiMin, "#.#") + " | Retrace " + str.tostring(retracePct, "#.#") + "% | RR " + str.tostring(rr, "#.##") + " | Candle " + candleName)
 
 plotshape(buySignal, "Buy flag", shape.flag, location.belowbar, color.new(color.green, 0), size = size.normal, text = "BUY", textcolor = color.green)
 bgcolor(buySignal ? color.new(color.green, 85) : na, title = "Buy background")
