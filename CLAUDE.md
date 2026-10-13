@@ -26,6 +26,8 @@ claude/
 │   └── telegram_bot.py        # Telegram handlers
 ├── mcp_server/
 │   └── server.py              # FastMCP server (TradingView tools)
+├── pinescript/
+│   └── mtf_pullback_buy_strategy.pine  # TradingView strategy + buy alert
 └── trading/
     ├── fetcher.py             # tvdatafeed OHLCV downloader
     ├── indicators.py          # pandas-ta RSI/MACD/BB/EMA/ATR/Stoch

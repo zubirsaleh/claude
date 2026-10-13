@@ -1,0 +1,191 @@
+//@version=6
+// Multi-timeframe pullback BUY setup — run on a 1-hour (H1) chart.
+//
+// A green flag is plotted (and an alert fires) when ALL of these are true:
+//   1. Daily trend   : EMA 8 above EMA 21 (last completed daily bar — no repaint)
+//   2. H1 trend      : EMA 50 above EMA 200
+//   3. RSI(6) ≤ 20   : on this bar or within the last N bars
+//   4. Retracement   : price has pulled back ≥ 50% of the previous swing-low → swing-high move
+//   5. Confirmation  : bullish Engulfing / Hammer / Inverted Hammer on H1
+//   6. Touch         : candle touched EMA 50, EMA 200 or the ascending trendline (last N bars)
+//   7. Risk-Reward   : (swing high − entry) / (entry − stop) ≥ 1.5
+//
+// Alerts: Add alert → Condition = this strategy → "alert() function calls only".
+strategy("MTF Pullback Buy Setup", shorttitle = "MTF Pullback Buy", overlay = true,
+     initial_capital = 10000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
+     commission_type = strategy.commission.percent, commission_value = 0.05,
+     process_orders_on_close = true)
+
+// ───── Inputs ─────
+grpTrend = "1-2 · Trend"
+dFastLen = input.int(8,   "Daily EMA fast",  minval = 1, group = grpTrend)
+dSlowLen = input.int(21,  "Daily EMA slow",  minval = 1, group = grpTrend)
+hFastLen = input.int(50,  "H1 EMA fast",     minval = 1, group = grpTrend)
+hSlowLen = input.int(200, "H1 EMA slow",     minval = 1, group = grpTrend)
+
+grpRsi = "3 · RSI"
+rsiLen      = input.int(6,      "RSI length",                    minval = 1, group = grpRsi)
+rsiLevel    = input.float(20.0, "Oversold level (≤)",                        group = grpRsi)
+rsiLookback = input.int(3,      "Oversold within last N bars",   minval = 0, group = grpRsi, tooltip = "0 = RSI must be oversold on the signal candle itself")
+
+grpSwing = "4 · Retracement"
+pivotLen   = input.int(5,       "Swing pivot strength (bars each side)", minval = 1, group = grpSwing)
+minRetrace = input.float(50.0,  "Min retracement %",                     group = grpSwing)
+maxRetrace = input.float(100.0, "Max retracement %",                     group = grpSwing, tooltip = "Beyond 100% the swing low is broken and the up-move is invalid")
+
+grpCandle = "5 · Confirmation candle"
+useEngulf    = input.bool(true,  "Bullish Engulfing",                     group = grpCandle)
+useHammer    = input.bool(true,  "Hammer",                                group = grpCandle)
+useInvHammer = input.bool(true,  "Inverted Hammer",                       group = grpCandle)
+wickRatio    = input.float(2.0,  "Hammer: long wick ≥ x × body",   minval = 0.5, group = grpCandle)
+oppWickRatio = input.float(1.0,  "Hammer: short wick ≤ x × body",  minval = 0.0, group = grpCandle)
+greenHammer  = input.bool(false, "Hammers must close green",              group = grpCandle)
+
+grpTouch = "6 · MA / trendline touch"
+touchEmaFast  = input.bool(true, "Touch H1 EMA fast (50)",  group = grpTouch)
+touchEmaSlow  = input.bool(true, "Touch H1 EMA slow (200)", group = grpTouch)
+touchTL       = input.bool(true, "Touch ascending trendline (last two swing lows)", group = grpTouch)
+touchTolPct   = input.float(0.10, "Touch tolerance %", minval = 0.0, step = 0.05, group = grpTouch)
+touchLookback = input.int(2, "Touch within last N bars", minval = 0, group = grpTouch)
+
+grpRisk = "7 · Risk-Reward"
+minRR      = input.float(1.5, "Min risk-reward",          minval = 0.1, step = 0.1, group = grpRisk)
+atrLen     = input.int(14,    "ATR length",               minval = 1,               group = grpRisk)
+slAtrMult  = input.float(0.2, "Stop buffer below pullback low (× ATR)", minval = 0.0, step = 0.1, group = grpRisk)
+
+grpVis = "Display"
+showTable = input.bool(true, "Show checklist table", group = grpVis)
+
+// ───── 1. Daily trend (confirmed daily bar, non-repainting) ─────
+[dEmaFast, dEmaSlow] = request.security(syminfo.tickerid, "D",
+     [ta.ema(close, dFastLen)[1], ta.ema(close, dSlowLen)[1]], lookahead = barmerge.lookahead_on)
+dailyTrend = dEmaFast > dEmaSlow
+
+// ───── 2. H1 trend ─────
+hEmaFast = ta.ema(close, hFastLen)
+hEmaSlow = ta.ema(close, hSlowLen)
+h1Trend  = hEmaFast > hEmaSlow
+
+// ───── 3. RSI oversold ─────
+rsi       = ta.rsi(close, rsiLen)
+rsiMin    = ta.lowest(rsi, rsiLookback + 1)
+rsiOk     = rsiMin <= rsiLevel
+
+// ───── 4. Swing structure & retracement ─────
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+lowSincePivot = ta.lowest(low, pivotLen)
+
+var float lastPL    = na
+var int   lastPLBar = na
+var float prevPL    = na
+var int   prevPLBar = na
+var float legLow    = na
+var float legHigh   = na
+var float pullLow   = na
+
+if not na(pl)
+    prevPL    := lastPL
+    prevPLBar := lastPLBar
+    lastPL    := pl
+    lastPLBar := bar_index - pivotLen
+
+if not na(ph)
+    legHigh := ph
+    legLow  := lastPL
+    pullLow := lowSincePivot
+else if not na(legHigh) and high > legHigh
+    // Price made a new high: the pullback is over, wait for the next swing high.
+    legHigh := na
+    legLow  := na
+    pullLow := na
+else if not na(pullLow)
+    pullLow := math.min(pullLow, low)
+
+legRange   = legHigh - legLow
+retracePct = not na(legRange) and legRange > 0 ? (legHigh - pullLow) / legRange * 100 : na
+retraceOk  = not na(retracePct) and retracePct >= minRetrace and retracePct <= maxRetrace
+
+// ───── 5. Bullish confirmation candle ─────
+body      = math.abs(close - open)
+bodyAdj   = math.max(body, syminfo.mintick)
+upperWick = high - math.max(open, close)
+lowerWick = math.min(open, close) - low
+
+isEngulf    = close > open and close[1] < open[1] and close >= open[1] and open <= close[1] and body > math.abs(close[1] - open[1])
+isHammer    = lowerWick >= wickRatio * bodyAdj and upperWick <= oppWickRatio * bodyAdj and (not greenHammer or close > open)
+isInvHammer = upperWick >= wickRatio * bodyAdj and lowerWick <= oppWickRatio * bodyAdj and (not greenHammer or close > open)
+
+candleOk   = (useEngulf and isEngulf) or (useHammer and isHammer) or (useInvHammer and isInvHammer)
+candleName = useEngulf and isEngulf ? "Engulfing" : useHammer and isHammer ? "Hammer" : useInvHammer and isInvHammer ? "Inv. Hammer" : "—"
+
+// ───── 6. Touch MA or trendline ─────
+hasTL   = not na(prevPL) and not na(lastPL) and lastPL > prevPL
+tlValue = hasTL ? lastPL + (lastPL - prevPL) / (lastPLBar - prevPLBar) * (bar_index - lastPLBar) : na
+
+tol = touchTolPct / 100
+touches(float lvl) =>
+    not na(lvl) and low <= lvl * (1 + tol) and high >= lvl * (1 - tol)
+
+touchNow  = (touchEmaFast and touches(hEmaFast)) or (touchEmaSlow and touches(hEmaSlow)) or (touchTL and touches(tlValue))
+touchOk   = ta.highest(touchNow ? 1 : 0, touchLookback + 1) > 0
+
+// ───── 7. Risk-Reward ─────
+atr         = ta.atr(atrLen)
+entryPrice  = close
+stopPrice   = math.min(low, nz(pullLow, low)) - atr * slAtrMult
+targetPrice = legHigh
+risk        = entryPrice - stopPrice
+rr          = not na(targetPrice) and risk > 0 ? (targetPrice - entryPrice) / risk : na
+rrOk        = not na(rr) and rr >= minRR
+
+// ───── Signal ─────
+buySignal = dailyTrend and h1Trend and rsiOk and retraceOk and candleOk and touchOk and rrOk
+
+plotshape(buySignal, "Buy flag", shape.flag, location.belowbar, color.new(color.green, 0), size = size.normal, text = "BUY", textcolor = color.green)
+bgcolor(buySignal ? color.new(color.green, 85) : na, title = "Buy background")
+
+if buySignal
+    alert(str.format("🟢 BUY setup {0} ({1}m) | {2} | Entry {3} | SL {4} | TP {5} | RR {6}",
+         syminfo.ticker, timeframe.period, candleName,
+         str.tostring(entryPrice, format.mintick), str.tostring(stopPrice, format.mintick),
+         str.tostring(targetPrice, format.mintick), str.tostring(rr, "#.##")),
+         alert.freq_once_per_bar_close)
+
+if buySignal and strategy.position_size == 0
+    strategy.entry("Long", strategy.long, comment = "BUY " + candleName)
+    strategy.exit("Exit", "Long", stop = stopPrice, limit = targetPrice, comment_loss = "SL", comment_profit = "TP")
+
+// ───── Plots ─────
+plot(hEmaFast, "H1 EMA fast", color.orange, 1)
+plot(hEmaSlow, "H1 EMA slow", color.purple, 2)
+plot(dEmaFast, "Daily EMA fast", color.new(color.teal, 30), 1, plot.style_stepline)
+plot(dEmaSlow, "Daily EMA slow", color.new(color.red, 30),  1, plot.style_stepline)
+
+var line tlLine = na
+if barstate.islast and touchTL
+    line.delete(tlLine)
+    tlLine := hasTL ? line.new(prevPLBar, prevPL, lastPLBar, lastPL, extend = extend.right, color = color.aqua, style = line.style_dashed, width = 1) : na
+
+// ───── Checklist table ─────
+var table tbl = table.new(position.top_right, 3, 9, border_width = 1)
+
+row(int r, string name, bool ok, string val) =>
+    table.cell(tbl, 0, r, name, text_color = color.white, bgcolor = color.new(color.gray, 25), text_size = size.small, text_halign = text.align_left)
+    table.cell(tbl, 1, r, ok ? "✔" : "✘", text_color = color.white, bgcolor = ok ? color.new(color.green, 10) : color.new(color.red, 10), text_size = size.small)
+    table.cell(tbl, 2, r, val, text_color = color.white, bgcolor = color.new(color.gray, 25), text_size = size.small)
+
+fmt(float v) => na(v) ? "—" : str.tostring(v, "#.##")
+
+if showTable and barstate.islast
+    table.cell(tbl, 0, 0, "BUY SETUP", text_color = color.white, bgcolor = color.new(color.blue, 20), text_size = size.small)
+    table.cell(tbl, 1, 0, "", bgcolor = color.new(color.blue, 20))
+    table.cell(tbl, 2, 0, timeframe.period == "60" ? "H1 ✓" : "Use H1 chart!", text_color = color.white, bgcolor = timeframe.period == "60" ? color.new(color.blue, 20) : color.new(color.red, 0), text_size = size.small)
+    row(1, "1 Daily EMA8 > EMA21",  dailyTrend, fmt(dEmaFast) + " / " + fmt(dEmaSlow))
+    row(2, "2 H1 EMA50 > EMA200",   h1Trend,    fmt(hEmaFast) + " / " + fmt(hEmaSlow))
+    row(3, "3 RSI(6) ≤ 20",         rsiOk,      fmt(rsi) + " (min " + fmt(rsiMin) + ")")
+    row(4, "4 Retracement ≥ 50%",   retraceOk,  fmt(retracePct) + "%")
+    row(5, "5 Bullish candle",      candleOk,   candleName)
+    row(6, "6 Touch MA/trendline",  touchOk,    touchNow ? "now" : touchOk ? "recent" : "—")
+    row(7, "7 Risk-Reward ≥ 1.5",   rrOk,       fmt(rr))
+    row(8, "ALL CONDITIONS",        buySignal,  buySignal ? "BUY 🚩" : "wait")
