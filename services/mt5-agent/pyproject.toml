@@ -1,0 +1,16 @@
+[project]
+name = "tsch-mt5-agent"
+version = "0.1.0"
+description = "Host-side restricted connector to the local MT5 terminal MCP server (unverified against a real terminal)"
+requires-python = ">=3.12"
+dependencies = ["tsch-contracts", "httpx>=0.28"]
+
+[project.scripts]
+tsch-mt5-agent = "tsch_mt5_agent.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tsch_mt5_agent"]

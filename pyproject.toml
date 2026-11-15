@@ -1,0 +1,50 @@
+[project]
+name = "tsch-workspace"
+version = "0.1.0"
+description = "Trading Strategy Control Hub (TSCH) workspace root"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/contracts", "packages/risk", "services/api", "services/mt5-agent", "services/worker"]
+
+[tool.uv.sources]
+tsch-contracts = { workspace = true }
+tsch-risk = { workspace = true }
+tsch-api = { workspace = true }
+tsch-mt5-agent = { workspace = true }
+tsch-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "tsch-contracts", "tsch-risk", "tsch-api", "tsch-mt5-agent", "tsch-worker",
+  "pytest>=8.3", "hypothesis>=6.120", "ruff>=0.8", "mypy>=1.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning"]
+markers = ["postgres: needs TSCH_TEST_DATABASE_URL pointing at PostgreSQL"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["bot", "mcp_server", "trading", "main.py", "config.py", "markov_hedge_fund.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "DTZ"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S603", "S607"]
+"services/api/alembic/versions/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["tsch_contracts", "tsch_risk", "tsch_api", "tsch_mt5_agent", "tsch_worker"]
+plugins = ["pydantic.mypy"]

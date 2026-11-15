@@ -1,0 +1,118 @@
+# One-command local stack:  infra/scripts/dev-secrets.sh && docker compose -f infra/docker/docker-compose.yml up --build
+# Only the reverse proxy publishes ports. Postgres, Redis, API, worker and web are internal.
+# The MT5 terminal and mt5-agent run on the HOST (systemd), never in this file.
+name: tsch
+
+x-hardening: &hardening
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  tmpfs: ["/tmp"]
+  restart: unless-stopped
+
+secrets:
+  db_password:
+    file: ../../secrets/db_password
+  operator_token:
+    file: ../../secrets/operator_token
+
+networks:
+  backend:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+  caddy_data: {}
+  caddy_config: {}
+
+services:
+  postgres:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_USER: tsch
+      POSTGRES_DB: tsch
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsch -d tsch"]
+      interval: 5s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.6-alpine
+    user: "999:1000"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+    <<: *hardening
+
+  api:
+    image: tsch-api:local
+    build:
+      context: ../..
+      dockerfile: infra/docker/python.Dockerfile
+      args: { PACKAGE: tsch-api }
+    command: ["sh", "-c", "alembic -c /app/alembic.ini upgrade head && exec uvicorn tsch_api.asgi:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
+    environment:
+      TSCH_DATABASE_URL: postgresql+psycopg://tsch@postgres:5432/tsch
+      TSCH_DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      TSCH_OPERATOR_TOKEN_FILE: /run/secrets/operator_token
+      TSCH_DEFAULT_MODE: SIM
+    secrets: [db_password, operator_token]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [backend, edge]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      retries: 12
+    <<: *hardening
+
+  worker:
+    image: tsch-worker:local
+    build:
+      context: ../..
+      dockerfile: infra/docker/python.Dockerfile
+      args: { PACKAGE: tsch-worker }
+    command: ["tsch-worker"]
+    environment:
+      TSCH_API_URL: http://api:8000
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [backend]
+    <<: *hardening
+
+  web:
+    image: tsch-web:local
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+    environment:
+      TSCH_API_INTERNAL_URL: http://api:8000
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [edge]
+    <<: *hardening
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    environment:
+      TSCH_SITE_ADDRESS: ${TSCH_SITE_ADDRESS:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api, web]
+    networks: [edge]
+    restart: unless-stopped

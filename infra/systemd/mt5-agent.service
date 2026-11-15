@@ -1,0 +1,41 @@
+# Host-side MT5 connector. EXAMPLE ONLY: Phase 1 ships `discover` (read-only tool inventory);
+# the long-running agent loop arrives in Phase 4 and has not been tested on a real terminal.
+#
+# Install:  sudo install -m 0644 mt5-agent.service /etc/systemd/system/
+#           sudo install -d -m 0750 -o root -g tsch-mt5 /etc/tsch
+#           sudo install -m 0640 -o root -g tsch-mt5 mt5_mcp_token /etc/tsch/mt5_mcp_token
+# The MCP API key is generated in the MT5 GUI (Tools > Options > MCP). Never commit it.
+[Unit]
+Description=TSCH MT5 agent (loopback MCP connector, read-only by default)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tsch-mt5
+Group=tsch-mt5
+Environment=TSCH_MT5_MCP_URL=http://127.0.0.1:22346/mcp
+Environment=TSCH_MT5_MCP_TOKEN_FILE=/etc/tsch/mt5_mcp_token
+ExecStart=/opt/tsch/.venv/bin/tsch-mt5-agent discover
+Restart=on-failure
+RestartSec=30
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+.mcp.json
+*.token
+secrets/
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+# node
+node_modules/
+.next/
+apps/web/next-env.d.ts
+# local
+*.sqlite
+*.db
+*.tsbuildinfo

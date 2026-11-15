@@ -1,125 +1,106 @@
 # CLAUDE.md
 
-This file provides guidance to AI assistants (Claude and others) working in this repository.
+Guidance for AI assistants (Claude and others) working in this repository. **Read this first.**
 
-## Repository Overview
+## Repository overview
 
 **Repo:** `zubirsaleh/claude`
-**Product:** TradingView → Claude → Telegram analyst bot.
+**Product:** Trading Strategy Control Hub (TSCH). A self-hosted control plane for strategy
+research and human-approved MT5 **demo** trading, deployed to a Hostinger Ubuntu 24.04 VPS.
+The spec is `docs/spec/v2/` (V2 supersedes all earlier NinjaTrader designs). Current status is in
+`docs/PHASE1_REPORT.md`.
 
-The user sends a plain-language trading query to a Telegram bot. The bot routes it to Claude (via Anthropic API), which calls TradingView tools to fetch live OHLCV data, compute technical indicators, and detect candlestick patterns, then returns a structured position analysis back to Telegram.
+## Non-negotiable rules (V2 policy, full text in `docs/spec/v2/CLAUDE_V2_POLICY.md`)
 
-A standalone MCP server (`mcp_server/server.py`) exposes the same tools to Claude Code for direct use in the CLI/desktop without the Telegram layer.
+- Modes: `SIM` (default), `MT5_DEMO`, `TRADINGVIEW_PAPER_MANUAL`, `LIVE_DISABLED`. Live execution is
+  not compiled in. Never add a live adapter or a config flag that enables live trading.
+- **TradingView never feeds order logic, signals, research, backtests or stored data.** The official
+  TradingView MCP is for the user's personal interactive research only. `tests/security/test_boundaries.py`
+  enforces this for V2 code.
+- MT5 is the only intended demo execution backend, through the host-side `mt5-agent` on
+  **loopback only**. Never expose MCP ports 22345/22346, and never bind MT5 MCP to `0.0.0.0`.
+- Every order needs explicit human approval with an expiry. The deterministic risk gate runs at
+  proposal, at approval, and immediately before send. It fails closed on stale or missing data, an
+  account identity change, a non-DEMO account, the kill switch, or a risk-engine error. AI is never the sole authoriser.
+- Unknown submit outcomes are reconciled by idempotency key and **never** resubmitted.
+- The 2% per-trade risk is a hard ceiling, not a recommendation. Size with broker tick size, tick value and
+  volume step. Never assume XAUUSD specs across brokers.
+- Fills, order events and the audit log are immutable. Show missing metrics as `N/A`; never
+  invent values, trades, win rates or performance claims. A backtest is a hypothesis.
+- Store timestamps as UTC; display defaults to `Asia/Kuala_Lumpur`; sessions use IANA zones with DST handling.
+- Never commit `.env`, `.mcp.json`, tokens, `secrets/`, credentials or cookies. Never put broker
+  passwords or MCP tokens in prompts, logs or Git.
+- Before using any MCP tool, list the tools and check permissions. Avoid trading, shell and file tools unless explicitly required.
+- Label platform facts VERIFIED, CLAIMED or UNVERIFIED (`docs/PLATFORM_CAPABILITY_MATRIX.md`).
+  Don't claim an integration works until it has been tested end to end.
 
-## Project Structure
+## Project structure
 
 ```
-claude/
-├── main.py                    # Entry point — starts Telegram bot
-├── config.py                  # Env-var config
-├── requirements.txt
-├── .env.example               # Required env vars template
-├── .claude/
-│   └── settings.json          # MCP server wiring for Claude Code
-├── bot/
-│   ├── claude_handler.py      # Anthropic API + tool-use loop + history
-│   └── telegram_bot.py        # Telegram handlers
-├── mcp_server/
-│   └── server.py              # FastMCP server (TradingView tools)
-└── trading/
-    ├── fetcher.py             # tvdatafeed OHLCV downloader
-    ├── indicators.py          # pandas-ta RSI/MACD/BB/EMA/ATR/Stoch
-    ├── patterns.py            # Candlestick pattern detection
-    └── analysis.py            # Combined full_analysis() + TV rating
+apps/web               Next.js 16 / React 19 / TypeScript (server components)
+services/api           FastAPI + SQLAlchemy 2 + Alembic; SIM broker; order pipeline
+services/worker        background jobs
+services/mt5-agent     host-side loopback MCP connector (systemd, not Docker)
+packages/contracts     domain models, BrokerAdapter protocol, order state machine, openapi.json
+packages/risk          pure deterministic sizing + risk gate
+infra/docker           compose, Dockerfiles, Caddy
+infra/systemd          mt5-agent unit
+infra/scripts          dev-secrets.sh, smoke-sim.sh
+tests/{unit,integration,security}
+docs/                  capability matrix, threat model, data model, phase reports, spec pack
 ```
 
-## Development Setup
+Legacy, outside V2 policy, and not to be connected to TSCH: `bot/`, `mcp_server/`, `trading/`,
+`main.py`, `config.py`, `markov_hedge_fund.py`, `requirements.txt`. This is the earlier
+TradingView → Claude → Telegram bot, which uses unofficial TradingView scrapers. See `docs/SOURCE_BOUNDARIES.md`.
 
-```bash
-git clone https://github.com/zubirsaleh/claude.git
-cd claude
-pip install -r requirements.txt
-cp .env.example .env          # fill in the four required vars
-python main.py                # starts the Telegram bot
-```
-
-### Prerequisites
-
-- Python 3.10+
-- A Telegram bot token (from [@BotFather](https://t.me/BotFather))
-- An Anthropic API key (console.anthropic.com)
-- A TradingView account (free tier works; credentials optional but unlock more data)
-
-## Common Commands
+## Common commands
 
 | Task | Command |
 |------|---------|
-| Install deps | `pip install -r requirements.txt` |
-| Start Telegram bot | `python main.py` |
-| Start MCP server only | `python mcp_server/server.py` |
+| Install Python deps | `uv sync` |
+| Lint / types | `uv run ruff check .` / `uv run mypy` |
+| Tests (SQLite) | `uv run pytest` |
+| Tests (+PostgreSQL) | `TSCH_TEST_DATABASE_URL=postgresql+psycopg://… uv run pytest` (wipes that DB) |
+| Migrations | `cd services/api && uv run alembic upgrade head` / `alembic check` |
+| New migration | `cd services/api && uv run alembic revision --autogenerate -m "…"` |
+| Regenerate OpenAPI | `uv run tsch-export-openapi` (CI fails on drift) |
+| Web | `cd apps/web && npm ci && npm test && npm run typecheck && npm run build` |
+| Full stack | `infra/scripts/dev-secrets.sh && TSCH_SITE_ADDRESS=":80" docker compose -f infra/docker/docker-compose.yml up -d --build --wait` |
+| E2E smoke | `infra/scripts/smoke-sim.sh` |
+| MT5 tool inventory (on VPS) | `TSCH_MT5_MCP_TOKEN_FILE=… tsch-mt5-agent discover` |
 
-## Git Workflow
+## Code conventions
 
-- **Primary branch:** `main`
-- **Feature branches:** `<area>/<short-description>` (e.g. `auth/oauth-login`)
-- **AI task branches:** `claude/<task-slug>` (auto-created by Claude Code on the web)
-- Commit messages should be imperative, present-tense, ≤ 72 chars: `Add user authentication flow`
-- Open a pull request for every change; do not push directly to `main`.
+- Python 3.12+, uv workspace, Ruff (line length 100, rules E,F,I,B,UP,S,DTZ), mypy `--strict`.
+- Money, prices and volumes are `Decimal`, never float. Datetimes are timezone-aware UTC (`DTZ` rule).
+- Pure domain logic lives in `packages/` with no I/O. Adapters and persistence live in `services/`.
+- Tests go in `tests/`, named `test_*.py`. API tests run on both SQLite and PostgreSQL through the `harness` fixture.
+- TypeScript strict, with `noUncheckedIndexedAccess`. Web unit tests use `node:test` (`lib/*.test.ts`).
+- Pin exact versions. New npm or Python dependencies must be at least two weeks old and pass `npm audit`.
 
-## Code Conventions
+## Git workflow
 
-Fill this section in once the stack is decided. Typical things to document:
+- Primary branch `main`. Feature branches `<area>/<short-description>`; AI branches `claude/<slug>`.
+- Commit messages are imperative, present tense, ≤ 72 characters.
+- Open a PR for every change. Don't push directly to `main`, and don't open PRs unless asked.
 
-- **Language / framework version** in use
-- **Formatting tool** (Prettier, Black, gofmt, etc.) and whether it runs automatically
-- **Linter** (ESLint, Ruff, golangci-lint, etc.) and any rule overrides
-- **Naming conventions** (camelCase vs snake_case, file naming, etc.)
-- **Test file location and naming** (`*.test.ts` next to source, or `tests/` directory, etc.)
-- **Import ordering** rules if enforced
+## AI assistant guidelines
 
-## Testing
+- Prefer editing existing files. No speculative abstractions. Comment only when the *why* is non-obvious.
+- Security first (OWASP Top 10). No hard-coded secrets. Ask before destructive git operations.
+- Run lint, types and tests after non-trivial changes, and report the actual results.
+- After each milestone, report: features built, files changed, tests run with results, unresolved
+  prerequisites, and next steps. Keep `docs/` current so the project can be restarted from the repo.
 
-Describe the test strategy:
+## Architecture decisions
 
-- Unit tests: `<framework>` — run with `<command>`
-- Integration tests: `<framework>` — run with `<command>`
-- E2E tests: `<framework>` — run with `<command>`
+> **2026-11-15 — V2: TSCH replaces the bot as the product.** Host-side `mt5-agent` talks to the MT5
+> MCP over loopback. The Docker stack never reaches MT5 directly. The SIM adapter carries the full
+> order lifecycle until a real terminal is verified.
 
-All new features should include tests. PRs must not reduce overall coverage.
+> **2026-11-15 — Interim auth.** Phase 1 uses a single operator bearer token from a secret file;
+> writes are disabled when it is absent. Phase 2 replaces it with user auth + MFA + CSRF.
 
-## Environment Variables
-
-List required environment variables and where to get them:
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `TELEGRAM_BOT_TOKEN` | Token from @BotFather | Yes |
-| `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs | Yes |
-| `ANTHROPIC_API_KEY` | Anthropic console API key | Yes |
-| `TRADINGVIEW_USERNAME` | TradingView login email | No |
-| `TRADINGVIEW_PASSWORD` | TradingView password | No |
-| `MAX_HISTORY` | Conversation turns kept in memory (default 20) | No |
-
-Never commit real secrets. Copy `.env.example` → `.env` and fill it in locally.
-
-## AI Assistant Guidelines
-
-Guidelines specifically for Claude Code and other AI assistants:
-
-- **Read this file first** before making any changes.
-- **Prefer editing existing files** over creating new ones.
-- **No unnecessary comments** — only add a comment when the *why* is non-obvious.
-- **No speculative abstractions** — implement exactly what is asked; don't design for hypothetical future requirements.
-- **Security first** — never introduce SQL injection, XSS, command injection, or other OWASP Top 10 vulnerabilities.
-- **No hard-coded secrets** — use environment variables at system boundaries.
-- **Ask before destructive git operations** — force-push, reset --hard, branch deletion, etc.
-- **Commit and push** all work to the designated feature branch; do not open a PR unless explicitly asked.
-- **Run tests** after any non-trivial change and confirm they pass before reporting work as done.
-
-## Architecture Decisions
-
-> **2026-06-05 — Single-process bot with inline tool execution**
-> The Telegram bot calls Claude's tool-use API synchronously in a thread pool (not as a separate MCP subprocess). This keeps deployment simple (one `python main.py`). The MCP server (`mcp_server/server.py`) is a separate entry point for Claude Code CLI/Desktop users who want to query TradingView directly without the bot.
-
-> **2026-06-05 — tvdatafeed for OHLCV + tradingview-ta for TA ratings**
-> `tvdatafeed` provides raw OHLCV history over TradingView's WebSocket. `tradingview-ta` scrapes TradingView's screener for the aggregated BUY/SELL/NEUTRAL rating. Both are unofficial but widely used. `pandas-ta` handles all local indicator maths so the bot works even when TV screener is unavailable.
+> **2026-06-05 (legacy)** — The Telegram bot used tvdatafeed and tradingview-ta. Superseded by V2;
+> not permitted in TSCH.

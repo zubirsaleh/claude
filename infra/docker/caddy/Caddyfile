@@ -1,0 +1,23 @@
+# TSCH_SITE_ADDRESS: your domain in production (automatic HTTPS), ":80" for local smoke tests.
+{$TSCH_SITE_ADDRESS:localhost} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		-Server
+	}
+	# The API's OpenAPI/docs UI is not published.
+	@docs path /docs /docs/* /redoc /openapi.json
+	respond @docs 404
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle /health {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

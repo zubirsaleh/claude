@@ -1,0 +1,11 @@
+node_modules
+.next
+.venv
+**/__pycache__
+secrets
+.git
+bot
+mcp_server
+trading
+docs
+tests

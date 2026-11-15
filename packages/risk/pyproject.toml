@@ -1,0 +1,13 @@
+[project]
+name = "tsch-risk"
+version = "0.1.0"
+description = "Pure deterministic risk policy and position sizing"
+requires-python = ">=3.12"
+dependencies = ["tsch-contracts"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tsch_risk"]
