@@ -79,6 +79,6 @@ Signals (Python, Pine mirror for charting)  ──suggest──►  Executor
 ## Engineering prompt (filled in)
 
 The full engineering prompt is kept in the conversation that produced this spec. These
-are its filled-in values: XAUUSD, 1M, all sessions, OANDA practice via v20, USD 5,000,
+are its filled-in values: XAUUSD, 1M, all sessions, OANDA practice via v20,
 0.4 lot fixed, USD 400 per-trade cut-loss, USD 1,200 daily stop, USD 40,000 paper account,
 15% max drawdown, Python.
