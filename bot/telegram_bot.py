@@ -12,6 +12,7 @@ from telegram.ext import (
 )
 from config import TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS
 from bot.claude_handler import chat, clear_history
+from bot import scalper_commands
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/start — welcome message\n"
         "/clear — reset conversation history\n"
         "/help — this message\n\n"
+        "*XAUUSD desk*\n"
+        "/taken <id> [fill] — you opened the alerted trade\n"
+        "/skip <id> — you passed on it\n"
+        "/closed <id> <price> — you closed it\n"
+        "/status — equity, limits, open trades\n"
+        "/kill — stop all alerts; close everything\n"
+        "/resume — reset kill switch\n\n"
         "*What you can ask*\n"
         "• Full market analysis: _BTC 4h full read_\n"
         "• Candlestick patterns: _Any patterns on ETH 1h?_\n"
@@ -111,5 +119,6 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("clear", cmd_clear))
     app.add_handler(CommandHandler("help", cmd_help))
+    scalper_commands.register(app)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     return app

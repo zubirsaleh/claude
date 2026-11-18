@@ -1,5 +1,5 @@
 anthropic>=0.40.0
-python-telegram-bot>=20.7
+python-telegram-bot[job-queue]>=20.7
 tvdatafeed @ git+https://github.com/rongardF/tvdatafeed.git@e6f6aaa7de439ac6e454d9b26d2760ded8dc4923
 tradingview-ta>=3.3.0
 pandas-ta>=0.3.14b0

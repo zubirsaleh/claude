@@ -23,7 +23,8 @@ claude/
 │   └── settings.json          # MCP server wiring for Claude Code
 ├── bot/
 │   ├── claude_handler.py      # Anthropic API + tool-use loop + history
-│   └── telegram_bot.py        # Telegram handlers
+│   ├── telegram_bot.py        # Telegram handlers
+│   └── scalper_commands.py    # /taken /skip /closed /status /kill /resume
 ├── mcp_server/
 │   └── server.py              # FastMCP server (TradingView tools)
 ├── scalper/                   # XAUUSD 1M scalper (OANDA practice)
@@ -31,8 +32,11 @@ claude/
 │   ├── sessions.py            # DST-aware Asia/London/NY session clock
 │   ├── risk.py                # Deterministic pre-trade risk gate + kill switch
 │   ├── broker_oanda.py        # OANDA v20 REST client
-│   ├── executor.py            # Only path to the broker
+│   ├── executor.py            # OANDA order path (unused while executing manually)
+│   ├── manual_desk.py         # Telegram-alert desk + shadow ledger (TV Paper Trading)
+│   ├── data.py                # UTC bar store + data-quality report
 │   └── journal.py             # Append-only decision log
+├── scripts/collect_xauusd.py  # Accumulate TradingView XAUUSD 1M history
 ├── tests/                     # pytest suite
 ├── docs/xauusd_scalper_spec.md
 └── trading/

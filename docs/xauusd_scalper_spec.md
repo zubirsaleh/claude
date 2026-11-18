@@ -10,7 +10,7 @@ Status: **Phase 2 in progress — data layer built; live TradingView collection 
 | Timeframe | 1M execution; 5M/15M/1H context only |
 | Sessions | Asia, London, New York (all) |
 | Chart / signals | TradingView (`OANDA:XAUUSD` feed, so chart = broker prices) |
-| Broker | OANDA **practice** account, v20 REST API |
+| Broker | **TradingView Paper Trading, executed manually** from Telegram alerts (owner choice B) |
 | Account | USD 40,000 (paper) — sized so USD 400 per trade = 1% |
 | Position size | **0.4 lot fixed = 40 oz = 40 units** → USD 40 per USD 1.00 move |
 | Cut-loss per trade | **USD 400** → stop at most USD 10.00 from entry |
@@ -41,7 +41,28 @@ Status: **Phase 2 in progress — data layer built; live TradingView collection 
 
 No new entries after Friday 16:00 NY.
 
-## Architecture
+## Architecture (option B — manual execution)
+
+```
+TradingView 1M bars ──► signal (none enabled until validated)
+                              │
+                              ▼
+                      RiskEngine (same hard limits)
+                              │ allowed
+                              ▼
+            Telegram alert #id (valid 2 min) ──► owner executes in TV Paper Trading
+                              ▲                       │
+   /taken /skip /closed ──────┴───── shadow ledger ◄──┘  stop/target hits seen on 1M bars
+                                                       (both touched in one bar ⇒ stop)
+```
+
+- `scalper/manual_desk.py` holds the shadow ledger, equity and daily P&L; `bot/scalper_commands.py`
+  adds `/taken /skip /closed /status /kill /resume` and a 60 s bar-monitor job.
+- Trading commands require `TELEGRAM_ALLOWED_USERS`; an empty allowlist denies them.
+- Spread is not in TradingView bars: `ASSUMED_SPREAD_USD = 0.35` until measured.
+- `/kill` blocks alerts and tells the owner to close all positions in TradingView by hand.
+
+### Original automated design (OANDA, kept for later)
 
 ```
 Signals (Python, Pine mirror for charting)  ──suggest──►  Executor
