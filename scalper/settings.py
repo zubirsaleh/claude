@@ -14,12 +14,12 @@ OUNCES_PER_LOT = 100
 
 @dataclass(frozen=True)
 class RiskLimits:
-    account_size_usd: float = 5000.0
-    lot_size: float = 0.04
-    max_daily_loss_pct: float = 2.0
+    # Paper account sized so the owner's USD 400 per-trade cut-loss is 1%.
+    account_size_usd: float = 40000.0
+    lot_size: float = 0.4
+    max_risk_per_trade_usd: float = 400.0
+    max_daily_losing_trades: int = 3
     max_drawdown_pct: float = 15.0
-    # Assumption pending owner approval: 0.5% per trade ("moderate").
-    max_risk_per_trade_pct: float = 0.5
     max_consecutive_losses: int = 4
     max_trades_per_day: int = 20
     max_open_positions: int = 1
@@ -36,11 +36,7 @@ class RiskLimits:
 
     @property
     def max_daily_loss_usd(self) -> float:
-        return self.account_size_usd * self.max_daily_loss_pct / 100
-
-    @property
-    def max_risk_per_trade_usd(self) -> float:
-        return self.account_size_usd * self.max_risk_per_trade_pct / 100
+        return self.max_risk_per_trade_usd * self.max_daily_losing_trades
 
 
 LIMITS = RiskLimits()

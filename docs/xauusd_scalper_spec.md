@@ -11,9 +11,10 @@ Status: **Phase 1 (safety foundation) built — awaiting approval for Phase 2 (d
 | Sessions | Asia, London, New York (all) |
 | Chart / signals | TradingView (`OANDA:XAUUSD` feed, so chart = broker prices) |
 | Broker | OANDA **practice** account, v20 REST API |
-| Account | USD 5,000 (paper) |
-| Position size | **0.04 lot fixed = 4 oz = 4 units** → USD 4 per USD 1.00 move |
-| Cut-loss | **2% per day = USD 100**, then locked until next trading day |
+| Account | USD 40,000 (paper) — sized so USD 400 per trade = 1% |
+| Position size | **0.4 lot fixed = 40 oz = 40 units** → USD 40 per USD 1.00 move |
+| Cut-loss per trade | **USD 400** → stop at most USD 10.00 from entry |
+| Daily stop | **3 full losses = USD 1,200**, then locked until next trading day |
 | Max drawdown | 15% from equity peak → kill switch, manual restart only |
 | Internal clock | UTC; trading day rolls at 17:00 New York |
 
@@ -21,7 +22,6 @@ Status: **Phase 1 (safety foundation) built — awaiting approval for Phase 2 (d
 
 | Assumption | Value | Why |
 |---|---|---|
-| Max risk per trade | 0.5% = USD 25 → stop ≤ USD 6.25 from entry | "Moderate" risk; with fixed 0.04 lot this caps stop distance |
 | Max consecutive losses | 4 → pause until next session | Limits tilt / regime-mismatch damage |
 | Max trades/day | 20 | Prevents overtrading on noise |
 | Max spread | USD 0.60 | Placeholder until replaced by measured OANDA session medians |
@@ -80,4 +80,5 @@ Signals (Python, Pine mirror for charting)  ──suggest──►  Executor
 
 The full engineering prompt is kept in the conversation that produced this spec. These
 are its filled-in values: XAUUSD, 1M, all sessions, OANDA practice via v20, USD 5,000,
-0.04 lot fixed, 2% daily cut-loss, 15% max drawdown, Python.
+0.4 lot fixed, USD 400 per-trade cut-loss, USD 1,200 daily stop, USD 40,000 paper account,
+15% max drawdown, Python.

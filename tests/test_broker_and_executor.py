@@ -91,7 +91,7 @@ class FakeBroker:
         return Quote(4000.0, 4000.3, now - timedelta(seconds=self.quote_age), True)
 
     def equity(self):
-        return 5000.0
+        return 40000.0
 
     def open_position_count(self):
         return 0
@@ -118,9 +118,9 @@ def parts(tmp_path, monkeypatch):
 def test_executor_sends_valid_order(parts):
     risk, journal, tmp = parts
     broker = FakeBroker()
-    d = Executor(broker, risk, journal).submit(OrderRequest("BUY", 4, 3995.0))
+    d = Executor(broker, risk, journal).submit(OrderRequest("BUY", 40, 3995.0))
     assert d.allowed, d.reasons
-    assert broker.orders == [("BUY", 4, 3995.0, None)]
+    assert broker.orders == [("BUY", 40, 3995.0, None)]
     assert risk.state.trades_today == 1
     assert "order_sent" in (tmp / "journal.jsonl").read_text()
 
@@ -131,7 +131,7 @@ def test_executor_blocks_on_kill_switch(parts):
     ex = Executor(broker, risk, journal)
     ex.kill("manual test")
     assert broker.closed
-    assert not ex.submit(OrderRequest("BUY", 4, 3995.0)).allowed
+    assert not ex.submit(OrderRequest("BUY", 40, 3995.0)).allowed
     assert broker.orders == []
 
 
@@ -140,12 +140,12 @@ def test_executor_fails_closed_on_broker_error(parts):
     broker = FakeBroker(fail_quote=True)
     ex = Executor(broker, risk, journal)
     for _ in range(3):
-        assert not ex.submit(OrderRequest("BUY", 4, 3995.0)).allowed
+        assert not ex.submit(OrderRequest("BUY", 40, 3995.0)).allowed
     assert broker.orders == []
     assert risk.state.kill_switch
 
 
 def test_executor_reports_unfilled(parts):
     risk, journal, _ = parts
-    d = Executor(FakeBroker(fill=False), risk, journal).submit(OrderRequest("BUY", 4, 3995.0))
+    d = Executor(FakeBroker(fill=False), risk, journal).submit(OrderRequest("BUY", 40, 3995.0))
     assert not d.allowed
