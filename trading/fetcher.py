@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import pandas as pd
-from tvdatafeed import TvDatafeed, Interval
+from tvDatafeed import TvDatafeed, Interval
 
 logger = logging.getLogger(__name__)
 
