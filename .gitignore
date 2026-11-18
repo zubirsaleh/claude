@@ -4,5 +4,6 @@ __pycache__/
 .pytest_cache/
 state/
 logs/
-data/
+data/*
+!data/xauusd_m1/
 .venv/
