@@ -26,6 +26,15 @@ claude/
 │   └── telegram_bot.py        # Telegram handlers
 ├── mcp_server/
 │   └── server.py              # FastMCP server (TradingView tools)
+├── scalper/                   # XAUUSD 1M scalper (OANDA practice)
+│   ├── settings.py            # Hard risk limits (read-only to agent)
+│   ├── sessions.py            # DST-aware Asia/London/NY session clock
+│   ├── risk.py                # Deterministic pre-trade risk gate + kill switch
+│   ├── broker_oanda.py        # OANDA v20 REST client
+│   ├── executor.py            # Only path to the broker
+│   └── journal.py             # Append-only decision log
+├── tests/                     # pytest suite
+├── docs/xauusd_scalper_spec.md
 └── trading/
     ├── fetcher.py             # tvdatafeed OHLCV downloader
     ├── indicators.py          # pandas-ta RSI/MACD/BB/EMA/ATR/Stoch
@@ -81,9 +90,7 @@ Fill this section in once the stack is decided. Typical things to document:
 
 Describe the test strategy:
 
-- Unit tests: `<framework>` — run with `<command>`
-- Integration tests: `<framework>` — run with `<command>`
-- E2E tests: `<framework>` — run with `<command>`
+- Unit tests: `pytest` — run with `python -m pytest tests -q`
 
 All new features should include tests. PRs must not reduce overall coverage.
 
@@ -99,6 +106,8 @@ List required environment variables and where to get them:
 | `TRADINGVIEW_USERNAME` | TradingView login email | No |
 | `TRADINGVIEW_PASSWORD` | TradingView password | No |
 | `MAX_HISTORY` | Conversation turns kept in memory (default 20) | No |
+| `OANDA_API_TOKEN` | OANDA practice API token (scalper) | For scalper |
+| `OANDA_ACCOUNT_ID` | OANDA practice account ID (scalper) | For scalper |
 
 Never commit real secrets. Copy `.env.example` → `.env` and fill it in locally.
 
