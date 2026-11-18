@@ -109,3 +109,23 @@ The full engineering prompt is kept in the conversation that produced this spec.
 are its filled-in values: XAUUSD, 1M, all sessions, OANDA practice via v20,
 0.4 lot fixed, USD 400 per-trade cut-loss, USD 1,200 daily stop, USD 40,000 paper account,
 15% max drawdown, Python.
+
+## Data collection
+
+TradingView returns ~5,000 1M bars (~3.5 trading days) per download, so a gap of more than
+~2 days is lost permanently. Collection runs in two places:
+
+1. **Cloud (primary):** scheduled task "XAUUSD 1M daily data collection", daily 03:47 UTC.
+   It commits `data/xauusd_m1/*.csv` to branch `ccr-9432a21d-5y2xfh` and push-notifies a summary.
+2. **Owner's machine (backup):** keeps its own local store; do not push it (avoids CSV merge conflicts).
+
+   ```bash
+   python -m venv .venv
+   .venv/bin/pip install -r requirements.txt        # Windows: .venv\Scripts\pip
+   .venv/bin/python scripts/collect_xauusd.py --store data/xauusd_m1_local
+   ```
+   - Linux/macOS cron (daily 15:17 local): `17 15 * * * cd /path/to/claude && .venv/bin/python scripts/collect_xauusd.py --store data/xauusd_m1_local >> logs/collect.log 2>&1`
+   - Windows: Task Scheduler → Daily → Program `C:\path\to\claude\.venv\Scripts\python.exe`,
+     arguments `scripts\collect_xauusd.py --store data\xauusd_m1_local`, start in `C:\path\to\claude`.
+
+The two stores can be merged later (`BarStore.merge` is idempotent) to fill any gap in the cloud copy.
