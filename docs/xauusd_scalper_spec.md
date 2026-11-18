@@ -167,3 +167,13 @@ past output). Signal on bar t is known at bar t's close.
 
 No parameters were tuned on these 5 days (that would be overfitting). Re-evaluate once
 ≥ 3 months are collected, with walk-forward splits and every variant counted.
+
+### Data finding: TradingView revises closed bars (2026-11-18)
+
+Two downloads ~15 min apart differed on 17 already-closed bars up to 2 days old: tick volume
+changed on all 17 (mostly down), and 4 had price edits (largest: a high lowered by USD 0.76,
+consistent with bad-tick cleaning). Consequence: backtests run on cleaned history while the live
+bot sees raw bars, so spikes that triggered live stops/signals may be absent in research —
+an optimistic bias. Every revision is now logged to `data/xauusd_m1/revisions.csv`; the size of
+the bias must be measured before trusting any backtest, and tick volume should not be a primary
+signal input.

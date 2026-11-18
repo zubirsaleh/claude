@@ -41,7 +41,7 @@ class BarStore:
         return self.root / f"{month}.csv"
 
     def load(self) -> pd.DataFrame:
-        files = sorted(self.root.glob("*.csv"))
+        files = sorted(p for p in self.root.glob("*.csv") if p.name != "revisions.csv")
         if not files:
             return pd.DataFrame(columns=COLUMNS, index=pd.DatetimeIndex([], tz="UTC", name="time"))
         df = pd.concat(pd.read_csv(f, index_col="time", parse_dates=["time"]) for f in files)
@@ -49,9 +49,14 @@ class BarStore:
         return df.sort_index()
 
     def merge(self, bars: pd.DataFrame) -> dict:
-        """Add bars; existing timestamps are overwritten and counted as revisions."""
+        """Add bars; existing timestamps are overwritten and counted as revisions.
+
+        TradingView retroactively edits closed bars (mostly tick volume, sometimes bad-tick
+        prices), so every revision is appended to revisions.csv with old and new values.
+        """
         self.root.mkdir(parents=True, exist_ok=True)
         added = revised = 0
+        changes = []
         months = bars.index.tz_convert("UTC").tz_localize(None).to_period("M")
         for month, chunk in bars.groupby(months):
             path = self._path(month)
@@ -59,13 +64,24 @@ class BarStore:
                 old = pd.read_csv(path, index_col="time", parse_dates=["time"])
                 old.index = pd.DatetimeIndex(old.index).tz_convert("UTC")
                 common = chunk.index.intersection(old.index)
-                revised += int((old.loc[common, COLUMNS] != chunk.loc[common, COLUMNS]).any(axis=1).sum())
+                diff = (old.loc[common, COLUMNS] != chunk.loc[common, COLUMNS]).any(axis=1)
+                revised += int(diff.sum())
+                if diff.any():
+                    when = common[diff.to_numpy()]
+                    changes.append(old.loc[when, COLUMNS].add_prefix("old_").join(
+                        chunk.loc[when, COLUMNS].add_prefix("new_")))
                 added += len(chunk.index.difference(old.index))
                 merged = pd.concat([old[~old.index.isin(chunk.index)], chunk]).sort_index()
             else:
                 added += len(chunk)
                 merged = chunk
             merged.to_csv(path, index_label="time", date_format="%Y-%m-%dT%H:%M:%S%z")
+        if changes:
+            log = pd.concat(changes)
+            log.insert(0, "seen_at", pd.Timestamp.now(tz="UTC").floor("s"))
+            path = self.root / "revisions.csv"
+            log.to_csv(path, mode="a", header=not path.exists(), index_label="time",
+                       date_format="%Y-%m-%dT%H:%M:%S%z")
         return {"added": added, "revised": revised}
 
 

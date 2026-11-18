@@ -36,6 +36,9 @@ def test_store_merge_is_idempotent_and_counts_revisions(tmp_path):
     changed = bars.copy()
     changed.iloc[-1, changed.columns.get_loc("close")] += 1
     assert store.merge(changed) == {"added": 0, "revised": 1}
+    log = pd.read_csv(tmp_path / "revisions.csv")
+    assert len(log) == 1
+    assert log["new_close"].iloc[0] == log["old_close"].iloc[0] + 1
     loaded = store.load()
     assert len(loaded) == 5
     assert loaded["close"].iloc[-1] == bars["close"].iloc[-1] + 1
