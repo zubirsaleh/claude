@@ -1,6 +1,6 @@
 # XAUUSD 1M Scalper — Specification
 
-Status: **Phase 1 (safety foundation) built — awaiting approval for Phase 2 (data & research).**
+Status: **Phase 2 in progress — data layer built; live TradingView collection pending tvdatafeed install.**
 
 ## Fixed inputs (from account owner)
 
@@ -64,9 +64,15 @@ Signals (Python, Pine mirror for charting)  ──suggest──►  Executor
 
 1. **Safety foundation** ✅ — `scalper/settings.py`, `sessions.py`, `risk.py`,
    `broker_oanda.py`, `executor.py`, `journal.py`; tests in `tests/`.
-2. **Data & cost model** — download multi-year XAUUSD bid/ask tick data (Dukascopy),
-   build 1M bid/ask bars, cross-check against OANDA candles, and measure the spread
-   distribution per session. *Needs network access to `datafeed.dukascopy.com` and an OANDA practice token.*
+2. **Data & cost model** (owner choice: TradingView only, via the repo's TradingView fetcher/MCP)
+   — `scalper/data.py` (UTC normalisation, monthly bar store, quality report) and
+   `scripts/collect_xauusd.py` ✅. Limits of this choice:
+   - TradingView returns ≤ 5,000 1M bars (~3.5 trading days) per request, so history must be
+     **accumulated** by running the collector at least every 2 days. ~3 months of collection
+     is needed before a first walk-forward split; ≥ 300 out-of-sample trades before any verdict.
+   - `OANDA:XAUUSD` bars on TradingView are bid-based OHLC with tick volume and **no spread**.
+     Costs are therefore an explicit assumption (default USD 0.35 spread + USD 0.10 slippage
+     per trade) stress-tested at 1.5× and 2×, then replaced by spreads measured in paper trading.
 3. **Regime classifier** — TREND / RANGE / VOLATILE-CHOP / NEWS-SHOCK; misclassification report.
 4. **Candidate strategies** — Asian-range breakout, London/NY open momentum,
    session-VWAP mean reversion, liquidity sweep reversal, HTF-trend EMA pullback.

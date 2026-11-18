@@ -1,6 +1,6 @@
 anthropic>=0.40.0
 python-telegram-bot>=20.7
-tvdatafeed>=2.0.0
+tvdatafeed @ git+https://github.com/rongardF/tvdatafeed.git@e6f6aaa7de439ac6e454d9b26d2760ded8dc4923
 tradingview-ta>=3.3.0
 pandas-ta>=0.3.14b0
 mcp[cli]>=1.0.0
@@ -12,3 +12,4 @@ yfinance>=0.2.40
 requests>=2.31.0
 tzdata>=2024.1
 pytest>=8.0.0
+tzlocal>=5.0
